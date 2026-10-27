@@ -4,7 +4,6 @@ import { MissilePlanner } from "../ui/MissilePlanner";
 import type { MissileSalvoExecution } from "../core/executions/MissileSalvoExecution";
 import { prepareMatch } from "./prepareMatch";
 import { loadingFrame } from "../ui/WorldLoading";
-import * as THREE from "three";
 import type { Game } from "../core/Game";
 import { unitLabel } from "../core/Game";
 import type { GameMap } from "../core/GameMap";
@@ -17,9 +16,9 @@ import { MessageType, NUKES, PlayerType, UnitType, type GameSettings } from "../
 import { AttackLabels } from "../render/AttackLabels";
 import { BuildLabels } from "../render/BuildLabels";
 import { GoldFloats } from "../render/GoldFloats";
-import { GlobeRenderer } from "../render/GlobeRenderer";
+import type { FlatRenderer } from "../render/FlatRenderer";
 import { Labels } from "../render/Labels";
-import { UnitLayer } from "../render/UnitLayer";
+import { FlatUnitLayer } from "../render/FlatUnitLayer";
 import { AlertFrame } from "../ui/AlertFrame";
 import { BuildBar } from "../ui/BuildBar";
 import { DevPanel } from "../ui/DevPanel";
@@ -35,7 +34,7 @@ export class App {
   private game!: Game;
   private online: OnlineClient | null = null;
   private hud!: Hud;
-  private unitLayer!: UnitLayer;
+  private unitLayer!: FlatUnitLayer;
   private goldFloats!: GoldFloats;
   private labels!: Labels;
   private attackLabels!: AttackLabels;
@@ -71,7 +70,7 @@ export class App {
   private down: { x: number; y: number; button: number; t: number } | null = null;
   private hoverTile = -1;
   private hoverPos = { x: 0, y: 0 };
-  private hoverPoint = new THREE.Vector3();
+  private hoverPoint = { x: 0, y: 0, z: 0, copy(o: {x:number;y:number;z:number}) { this.x=o.x;this.y=o.y;this.z=o.z;return this; } };
   private hasHoverPoint = false;
   private running = false;
   private uiHidden = false;
@@ -79,7 +78,7 @@ export class App {
 
   constructor(
     private map: GameMap,
-    private globe: GlobeRenderer,
+    private globe: FlatRenderer,
     private ui: HTMLElement,
     private labelsEl: HTMLElement,
   ) {
@@ -107,8 +106,11 @@ export class App {
     this.game = game;
     const human = game.human!;
     game.onTerrainSunk = (t) => this.globe.paintSunk(t);
-    for (const p of game.allPlayers()){this.globe.setPlayerColor(p.smallID,new THREE.Color(p.color));this.globe.setPlayerPattern(p.smallID,p.cosmetics);}
-    this.unitLayer = new UnitLayer(this.globe, game);
+    for (const p of game.allPlayers()){
+      this.globe.setPlayerColor(p.smallID, p.color);
+      this.globe.setPlayerPattern(p.smallID, p.cosmetics);
+    }
+    this.unitLayer = new FlatUnitLayer(this.globe, game);
     game.onBorderAssault = (tile, color) => this.unitLayer.ping(tile, color, 16);
     this.goldFloats = new GoldFloats(this.labelsEl, this.globe);
     game.onGoldFloat = (tile, gold, player, troops) => {
@@ -132,7 +134,11 @@ export class App {
         const other = game.player(id);
         if (other) this.order({kind:'extend',target:other.smallID},()=>game.extendAlliance(human, other));
       },
-      onSelectPlayer: (p) => this.playerPanel.open(p),
+      onSelectPlayer: (p) => {
+        this.playerPanel.open(p);
+        const t = this.anyTileOf(p);
+        if (t >= 0) this.globe.flyTo(t, 700);
+      },
       onAttackRatio: (v) => this.setRatio("attackRatio",v),
       onTroopRatio: (v) => this.setRatio("troopRatio",v),
       onEmoji: (e) => {
@@ -263,7 +269,8 @@ export class App {
     progress("Preparing building and vehicle textures…", 93);
     await this.unitLayer.warmAssets(loadingFrame);
     progress("Warming up graphics…", 95);
-    await this.globe.renderer.compileAsync(this.globe.scene, this.globe.camera);
+    // FlatRenderer.renderer.compileAsync is a no-op stub
+    await this.globe.renderer.compileAsync();
     for (let i=0;i<4;i++) { this.globe.render(); await loadingFrame(); }
     progress("Ready to deploy", 100);
     if (this.online) {
@@ -290,8 +297,14 @@ export class App {
   }
 
   private anyTileOf(p: Player): number {
+    if (p.spawnTile >= 0 && this.map.isValid(p.spawnTile)) return p.spawnTile;
+    if (p.tiles.size > 0) {
+      for (const t of p.tiles) return t;
+    }
     for (const t of p.borderTiles) return t;
-    for (const t of p.tiles) return t;
+    if (p.countryId && this.map.countries[p.countryId]?.centroid >= 0) {
+      return this.map.countries[p.countryId].centroid;
+    }
     return -1;
   }
   private anyShoreTileOf(p: Player): number {

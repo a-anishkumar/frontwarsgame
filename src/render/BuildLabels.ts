@@ -3,7 +3,7 @@ import { unitLabel } from "../core/Game";
 import type { Unit } from "../core/Unit";
 import { h } from "../ui/dom";
 import { iconImg } from "../ui/icons";
-import type { GlobeRenderer } from "./GlobeRenderer";
+import type { RendererInterface } from "./RendererInterface";
 
 interface Entry {
   el: HTMLElement;
@@ -18,7 +18,7 @@ export class BuildLabels {
 
   constructor(
     private container: HTMLElement,
-    private globe: GlobeRenderer,
+    private globe: RendererInterface,
     private game: Game,
   ) {}
 

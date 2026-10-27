@@ -19,6 +19,8 @@ export interface AllianceRequest {
   status: "pending" | "accepted" | "rejected" | "expired";
 }
 
+export type BotPersonality = "Neutral" | "Aggressive" | "Expansionist" | "Defensive" | "Opportunist";
+
 export class Player {
   // identity
   readonly smallID: PlayerID;
@@ -26,6 +28,7 @@ export class Player {
   readonly type: PlayerType;
   readonly color: string; // css hex
   readonly countryId: number; // 0 = none
+  personality?: BotPersonality;
   /** flag/emoji shown next to the name */
   readonly flag: string;
   cosmetics:Cosmetics={...DEFAULT_COSMETICS};

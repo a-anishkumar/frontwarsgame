@@ -8,3 +8,4 @@ dist
 !.env.example
 .neon
 .ref/
+src_flat_backup/

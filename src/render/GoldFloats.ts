@@ -1,6 +1,6 @@
 import { fmt, fmtTroops } from "../core/executions/AttackExecution";
 import type { TileRef } from "../core/types";
-import type { GlobeRenderer } from "./GlobeRenderer";
+import type { RendererInterface } from "./RendererInterface";
 
 interface Pop {
   el: HTMLElement;
@@ -16,7 +16,7 @@ export class GoldFloats {
 
   constructor(
     private container: HTMLElement,
-    private globe: GlobeRenderer,
+    private globe: RendererInterface,
   ) {}
 
   spawn(tile: TileRef, gold: number, troops = 0): void {
@@ -45,10 +45,12 @@ export class GoldFloats {
         p.el.style.display = "none";
         continue;
       }
-      const rise = 36 * t;
+      const easeOut = 1 - Math.pow(1 - t, 2.5);
+      const rise = 46 * easeOut;
+      const scalePop = Math.max(0.9, this.proj.scale) * (1 + 0.28 * Math.sin(Math.min(1, t * 3) * Math.PI));
       p.el.style.display = "";
-      p.el.style.opacity = String(1 - t);
-      p.el.style.transform = `translate(-50%, -100%) translate(${this.proj.x}px, ${this.proj.y - 18 - rise}px) scale(${Math.max(0.9, this.proj.scale)})`;
+      p.el.style.opacity = String(Math.max(0, 1 - Math.pow(t, 1.8)));
+      p.el.style.transform = `translate(-50%, -100%) translate3d(${this.proj.x.toFixed(1)}px, ${(this.proj.y - 18 - rise).toFixed(1)}px, 0) scale(${scalePop.toFixed(2)})`;
     }
   }
 }

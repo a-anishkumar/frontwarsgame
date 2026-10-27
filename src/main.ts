@@ -32,17 +32,17 @@ async function main() {
     await loadingFrame();
     await loadingFrame();
     try {
-      const [map, { App }, { GlobeRenderer }] = await Promise.all([
+      const [map, { App }, { FlatRenderer }] = await Promise.all([
         online ? loadOnlineMap(serverURL+online.info.mapURL,online.info.mapHash) : settings.customWorld ? generateAsync(settings.customWorld,(m,n)=>loading.set(m,n*.6)) : loadWorld(settings.world, (m) => loading.set(m, m.includes("terrain") ? 45 : m.includes("Grouping") ? 55 : m.includes("Splitting") ? 30 : 12)),
         import("./app/App"),
-        import("./render/GlobeRenderer"),
+        import("./render/FlatRenderer"),
       ]);
       loading.set("Loading icons and unit sprites…", 60);
-      const [{ whenHudGlyphsReady }, { whenTrainSpritesReady }] = await Promise.all([import("./ui/icons"), import("./render/UnitLayer")]);
+      const [{ whenHudGlyphsReady }, { whenTrainSpritesReady }] = await Promise.all([import("./ui/icons"), import("./render/FlatUnitLayer")]);
       await Promise.all([new Promise<void>(whenHudGlyphsReady), new Promise<void>(whenTrainSpritesReady), document.fonts.ready]);
-      loading.set("Preparing the globe…", 68);
+      loading.set("Preparing the 2D map…", 68);
       await loadingFrame();
-      const globe = new GlobeRenderer(canvas, map);
+      const globe = new FlatRenderer(canvas, map);
       const app = new App(map, globe, ui, labelsEl);
       const game=online?await createOnlineGame(map,settings,online.info.members,online.client.profile!.id):undefined;
       await app.start(settings, (message, percent) => loading.set(message, percent),online&&game?{client:online.client,game}:undefined);

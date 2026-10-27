@@ -580,10 +580,8 @@ export class GlobeRenderer {
 
   /** highlight the tiles currently being fought over by the local player's attacks */
   setFrontTiles(outgoing: Iterable<number>, incoming: Iterable<number>): void {
-    // Mark the visible cell center so thin fronts survive polar pixel merging.
-    const visible = (tiles: Iterable<number>) => [...new Set(Array.from(tiles, t => displayTile(this.map.width, this.map.height, t)))];
-    const nextOut = visible(outgoing);
-    const nextInc = visible(incoming);
+    const nextOut = Array.from(outgoing);
+    const nextInc = Array.from(incoming);
     if (nextOut.length === this.previousOut.length && nextInc.length === this.previousIn.length &&
       nextOut.every((t, i) => t === this.previousOut[i]) && nextInc.every((t, i) => t === this.previousIn[i])) return;
     this.previousOut = nextOut;

@@ -81,7 +81,7 @@ export class Hud {
 
     this.leaderboard = h("div", { class: "panel glass leaderboard" });
 
-    this.popBar = h("div", { class: "popbar" }, h("div", { class: "popbar-troops" }), h("div", { class: "popbar-workers" }));
+    this.popBar = h("div", { class: "popbar" }, h("div", { class: "popbar-troops" }), h("div", { class: "popbar-workers" }), h("div", { class: "popbar-marker", title: "42% Rule: Optimal troop recruitment sweet spot", style: "left: 42%" }));
     this.popText = h("div", { class: "stat-row" });
     this.goldText = h("div", { class: "stat-value gold" });
     this.growthText = h("div", { class: "stat-sub" });
@@ -182,11 +182,19 @@ export class Hud {
     const wr = (human.workers / max) * 100;
     (this.popBar.children[0] as HTMLElement).style.width = Math.min(100, tr) + "%";
     (this.popBar.children[1] as HTMLElement).style.width = Math.max(0, Math.min(100 - tr, wr)) + "%";
-    this.popText.replaceChildren(
+    const popChildren: Node[] = [
       h("span", { class: "c-troops" }, namedIcon("troops", 14), h("b", {}, fmtTroops(human.troops)), " troops"),
       h("span", { class: "c-workers" }, namedIcon("workers", 14), h("b", {}, fmtTroops(human.workers)), " workers"),
       h("span", { class: "muted" }, `max ${fmtTroops(max)}`),
-    );
+    ];
+    if (!game.inSpawnPhase() && human.alive) {
+      if (tr < 10) {
+        popChildren.push(h("span", { class: "c-deathzone", title: "Death Zone: troops below 10% severely reduce regeneration!" }, "⚠️ <10%"));
+      } else if (tr >= 38 && tr <= 46) {
+        popChildren.push(h("span", { class: "c-sweetspot", title: "42% Rule: peak troop replenishment rate!" }, "🔥 42%"));
+      }
+    }
+    this.popText.replaceChildren(...popChildren);
     this.goldText.replaceChildren(namedIcon("gold", 14), h("b", {}, fmt(human.gold)), h("span", { class: "muted" }, ` +${fmt(game.goldIncome(human) * 10)}/s`));
     this.growthText.replaceChildren(h("b", {}, `+${fmtTroops(cfg.populationIncrease(human) * 10)}`), h("span", { class: "muted" }, "/s"));
     this.attackLabel.textContent = `${Math.round(human.attackRatio * 100)}% · ${fmtTroops(human.troops * human.attackRatio)}`;

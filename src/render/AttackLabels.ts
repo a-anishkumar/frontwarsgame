@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import type { AttackExecution } from "../core/executions/AttackExecution";
 import { fmtTroops } from "../core/executions/AttackExecution";
-import type { GlobeRenderer } from "./GlobeRenderer";
+import type { RendererInterface } from "./RendererInterface";
 
 const POLL_MS = 200;
 const ANIM_MS = 250;
@@ -35,7 +35,7 @@ export class AttackLabels {
 
   constructor(
     private container: HTMLElement,
-    private globe: GlobeRenderer,
+    private globe: RendererInterface,
     private game: Game,
   ) {}
 

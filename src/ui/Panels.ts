@@ -75,8 +75,10 @@ export class PlayerPanel {
       h(
         "div",
         { class: "kv-list" },
+        !isMe ? stat("Bot", h("b", { class: "bot-type", style: "color: #ffe566;" }, p.personality ?? "Neutral")) : null,
         stat("Land", `${game.landPercent(p).toFixed(2)}% · ${p.numTiles.toLocaleString()} tiles`),
         stat("Troops", h("span", { class: "icon-stat" }, namedIcon("troops", 14), `${fmtTroops(p.troops)} · ${fmtTroops(p.workers)} workers`)),
+        stat("Attacking Troops", fmtTroops(p.outgoingAttacks.filter((a) => a.isActive()).reduce((sum, a) => sum + a.troops(), 0))),
         stat("Gold", h("span", { class: "icon-stat" }, namedIcon("gold", 14), fmt(p.gold))),
         stat(
           "Buildings",

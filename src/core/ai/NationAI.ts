@@ -54,6 +54,39 @@ export class NationAI implements Execution {
         this.attackRate = this.random.nextInt(18, 32);
         break;
     }
+
+    // FrontWars-style personality tuning
+    const personality = this.player.personality ?? "Neutral";
+    if (personality === "Neutral") {
+      this.aggression = 0.5;
+      this.reserveRatio = 0.45;
+      this.expandRatio = 0.18;
+      this.attackRate = Math.round(this.attackRate * 1.4);
+      this.player.attackRatio = 0.15;
+    } else if (personality === "Aggressive") {
+      this.aggression = 1.45;
+      this.reserveRatio = 0.12;
+      this.expandRatio = 0.08;
+      this.attackRate = Math.max(14, Math.round(this.attackRate * 0.65));
+      this.player.attackRatio = 0.35;
+    } else if (personality === "Expansionist") {
+      this.aggression = 0.95;
+      this.reserveRatio = 0.16;
+      this.expandRatio = 0.05;
+      this.player.attackRatio = 0.25;
+    } else if (personality === "Defensive") {
+      this.aggression = 0.60;
+      this.reserveRatio = 0.40;
+      this.expandRatio = 0.15;
+      this.attackRate = Math.round(this.attackRate * 1.25);
+      this.player.attackRatio = 0.18;
+    } else if (personality === "Opportunist") {
+      this.aggression = 1.30;
+      this.reserveRatio = 0.20;
+      this.expandRatio = 0.10;
+      this.player.attackRatio = 0.30;
+    }
+
     this.attackRate = Math.round(this.attackRate * game.config.aiCadence());
     this.attackTick = this.random.nextInt(0, this.attackRate - 1);
   }
@@ -160,9 +193,9 @@ export class NationAI implements Execution {
     const { invaders } = game.homeFront(p);
     const around = game.neighbors(p);
     const enemies = (around.players.length ? around.players : invaders).filter((n) => !p.isFriendly(n));
-    if (enemies.length === 0) {
-      if (this.random.chance(3)) this.attackWithRandomBoat();
-      return;
+    if (enemies.length === 0 || (p.personality === "Expansionist" && this.random.chance(3))) {
+      if (this.random.chance(2)) this.attackWithRandomBoat(enemies);
+      if (enemies.length === 0) return;
     }
     const incoming = this.findIncomingAttacker(enemies);
     if (incoming) {
@@ -217,10 +250,23 @@ export class NationAI implements Execution {
     }
     const others = enemies.filter((e) => e.type !== PlayerType.Bot);
     if (others.length === 0) return;
-    others.sort((a, b) => a.troops / Math.max(1, a.numTiles) - b.troops / Math.max(1, b.numTiles));
-    const target = others[0];
+
+    // Neutral bots guard homeland and do not launch unprovoked offensive wars
+    if (p.personality === "Neutral") return;
+
+    let target: Player;
+    if (p.personality === "Opportunist") {
+      // Strike enemies currently distracted in other wars
+      const distracted = others.filter((e) => e.outgoingAttacks.length > 0 || e.incomingAttacks.length > 0);
+      target = distracted.length > 0 ? distracted[0] : others[0];
+    } else {
+      others.sort((a, b) => a.troops / Math.max(1, a.numTiles) - b.troops / Math.max(1, b.numTiles));
+      target = others[0];
+    }
+
     const ratio = p.troops / Math.max(1, target.troops);
-    const threshold = this.hard ? 0.9 / this.aggression : 1.15 / this.aggression;
+    const baseThresh = p.personality === "Defensive" ? 2.0 : this.hard ? 0.9 : 1.15;
+    const threshold = baseThresh / this.aggression;
     if (ratio >= threshold || (p.relation(target) <= Relation.Distrustful && this.random.chance(2))) {
       if (target.isHuman() && game.ticks - target.spawnedAt < game.config.spawnImmunityTicks()) return;
       this.sendAttack(target);
@@ -246,7 +292,8 @@ export class NationAI implements Execution {
     const p = this.p;
     const game = this.game;
     const max = this.maxPop();
-    const keep = max * (target && !urgent ? this.reserveRatio : this.expandRatio);
+    const rawKeep = max * (target && !urgent ? this.reserveRatio : this.expandRatio);
+    const keep = Math.max(max * 0.12, rawKeep);
     let troops: number;
     if (target === null) {
       const bite = Math.max(80, p.troops * (share ?? (this.early() ? 0.22 : 0.3)));

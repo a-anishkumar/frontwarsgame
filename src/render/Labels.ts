@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import type { Player } from "../core/Player";
 import { fmtTroops } from "../core/executions/AttackExecution";
-import type { GlobeRenderer } from "./GlobeRenderer";
+import type { RendererInterface } from "./RendererInterface";
 
 /** HTML name/troop labels glued to a stable owned tile on the globe. */
 export class Labels {
@@ -13,7 +13,7 @@ export class Labels {
 
   constructor(
     private container: HTMLElement,
-    private globe: GlobeRenderer,
+    private globe: RendererInterface,
     private game: Game,
   ) {}
 
@@ -26,7 +26,7 @@ export class Labels {
         this.centroids.delete(p);
         continue;
       }
-      if (p.isAI() && dist > 220 && !this.game.inSpawnPhase()) continue;
+      if (p.isAI() && dist > 650 && !this.game.inSpawnPhase()) continue;
       const prev = this.centroids.get(p);
       if (prev !== undefined && map.owner[prev] === p.smallID && map.isLand(prev)) continue;
       this.centroids.set(p, this.pickAnchor(p));
@@ -70,8 +70,8 @@ export class Labels {
         continue;
       }
       const share = this.game.landPercent(p) / 100;
-      const minShare = Math.max(0, (dist - 110) / 340) * 0.004;
-      if (!this.game.inSpawnPhase() && (share < minShare || (p.isAI() && dist > 220)) && !p.isHuman()) {
+      const minShare = Math.max(0, (dist - 110) / 450) * 0.002;
+      if (!this.game.inSpawnPhase() && (share < minShare || (p.isAI() && dist > 650)) && !p.isHuman()) {
         if (el && el.style.display !== "none") el.style.display = "none";
         continue;
       }
