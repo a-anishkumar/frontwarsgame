@@ -1211,6 +1211,10 @@ export class App {
     } else if (type === UnitType.Radar) {
       range = cfg.radarRange();
       rangeColor = 0x86efac;
+    } else if (type === UnitType.CoastalBattery) {
+      const same = game.stackTarget(human, type, tile);
+      range = cfg.coastalBatteryRange(same ? same.level : 1);
+      rangeColor = 0xff9500;
     } else if (NUKES.has(type)) ({ outer: range, inner } = cfg.nukeMagnitude(type));
     const innerColor = 0xff453a;
     this.unitLayer.setGhost(type, tile, this.ghostError === null, range, inner, rangeColor, innerColor, !snap && this.hasHoverPoint ? this.hoverPoint : null, human.color);

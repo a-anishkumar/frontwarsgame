@@ -400,6 +400,7 @@ function settingsForm(s: GameSettings): { el: HTMLElement; read: () => Partial<G
     { type: UnitType.Port, label: "Dock" },
     { type: UnitType.MissileSilo, label: "Silo" },
     { type: UnitType.SAMLauncher, label: "SAM" },
+    { type: UnitType.CoastalBattery, label: "Battery" },
     { type: UnitType.Warship, label: "Warship" },
     { type: UnitType.AtomBomb, label: "Atom" },
     { type: UnitType.HydrogenBomb, label: "H-Bomb" },

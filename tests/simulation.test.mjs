@@ -6,6 +6,7 @@ import { Game } from '../src/core/Game.ts';
 import { Config } from '../src/core/Config.ts';
 import { AttackExecution } from '../src/core/executions/AttackExecution.ts';
 import { TransportShipExecution } from '../src/core/executions/TransportShipExecution.ts';
+import { CoastalBatteryExecution } from '../src/core/executions/CoastalBatteryExecution.ts';
 import { portWaterTile } from '../src/core/executions/PortExecution.ts';
 import { NukeExecution } from '../src/core/executions/NukeExecution.ts';
 import { WaterPathfinder } from '../src/core/WaterPathfinder.ts';
@@ -588,4 +589,56 @@ test('army boat engages in naval combat with enemy troop ship and warship', () =
  // Enemy troop transport suffered casualties or was sunk
  assert.ok(enemyTroopUnit.troops < 100 || !enemyTroopUnit.active);
  assert.ok(u1.troops < 1000);
+});
+
+test('coastal battery placement validation and automatic naval defense against hostile ships', () => {
+  const { map, game } = world(128, 64, T.Water);
+  const shoreTile = map.ref(15, 15);
+  const inlandTile = map.ref(16, 15);
+  const seaTile = map.ref(15, 14);
+
+  map.terrain[shoreTile] = T.Plains;
+  map.terrain[inlandTile] = T.Plains;
+  // shoreTile is adjacent to water (15, 14 is water)
+  // make inlandTile surrounded by land so it is not a shore
+  map.terrain[map.ref(16, 14)] = T.Plains;
+  map.terrain[map.ref(16, 16)] = T.Plains;
+  map.terrain[map.ref(17, 15)] = T.Plains;
+  map.terrain[map.ref(17, 14)] = T.Plains;
+  map.terrain[map.ref(17, 16)] = T.Plains;
+  map.terrain[map.ref(15, 16)] = T.Plains;
+
+  const p1 = player(game, shoreTile);
+  game.conquer(p1, inlandTile);
+  p1.gold = 5000000;
+
+  // Inland tile cannot build Coastal Battery
+  const inlandResult = build(game, p1, U.CoastalBattery, inlandTile);
+  assert.equal(inlandResult.ok, false);
+  assert.equal(inlandResult.message, 'Coastal Batteries must be built on the coast');
+
+  // Shore tile succeeds
+  const shoreResult = build(game, p1, U.CoastalBattery, shoreTile);
+  assert.equal(shoreResult.ok, true);
+
+  const battery = p1.unitsOf(U.CoastalBattery)[0];
+  assert.ok(battery);
+  battery.constructing = false; // finish building
+
+  // Create an enemy player and enemy landing transport at sea within range
+  const p2 = game.addPlayer('Enemy Nation', P.Nation, '#0000ff');
+  p2.hasSpawned = true;
+  const enemyTransport = game.addUnit(U.TransportShip, p2, seaTile);
+  enemyTransport.troops = 400;
+
+  const batteryExec = new CoastalBatteryExecution(battery);
+  batteryExec.init(game);
+
+  // Trigger tick - battery should engage enemy transport with shell
+  const initialExecutionsCount = game.executions.length;
+  batteryExec.tick();
+
+  // A ShellExecution was dispatched targeting the enemy transport
+  assert.ok(battery.cooldownUntil > game.ticks);
+  assert.equal(battery.targetUnit, enemyTransport);
 });

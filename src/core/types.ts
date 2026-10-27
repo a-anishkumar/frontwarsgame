@@ -36,6 +36,7 @@ export enum UnitType {
   TradeShip = "trade_ship",
   Train = "train",
   Radar = "radar",
+  CoastalBattery = "coastal_battery",
   AtomBomb = "atom_bomb",
   HydrogenBomb = "hydrogen_bomb",
   MIRV = "mirv",
@@ -61,6 +62,7 @@ export const STRUCTURES: ReadonlySet<UnitType> = new Set([
   UnitType.MissileSilo,
   UnitType.SAMLauncher,
   UnitType.Radar,
+  UnitType.CoastalBattery,
 ]);
 
 export const NUKES: ReadonlySet<UnitType> = new Set([

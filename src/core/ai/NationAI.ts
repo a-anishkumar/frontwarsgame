@@ -543,6 +543,17 @@ export class NationAI implements Execution {
         }
       }
     }
+    // Coastal Battery: coastal defense against enemy warships and naval landing craft
+    const batteries = p.unitCount(UnitType.CoastalBattery);
+    const batteryCost = cfg.unitCost(UnitType.CoastalBattery, game.ownedForCost(p, UnitType.CoastalBattery));
+    if (p.gold >= batteryCost && batteries < 1 + Math.floor(refTiles / 5000) && this.random.chance(30)) {
+      const shore = game.shoreTiles(p);
+      if (shore.length) {
+        for (let i = 0; i < 6; i++) {
+          if (this.tryBuild(UnitType.CoastalBattery, this.random.randElement(shore))) return;
+        }
+      }
+    }
     // Missile silo (mid/late game, not on easy)
     if (!cfg.settings.disableNukes && cfg.difficulty !== Difficulty.Easy && minutes > 6) {
       const silos = p.unitCount(UnitType.MissileSilo);

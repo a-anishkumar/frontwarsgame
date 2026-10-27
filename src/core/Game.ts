@@ -1017,6 +1017,7 @@ export class Game {
     if (STRUCTURES.has(type)) {
       if (map.owner[tile] !== player.smallID) return "Must build on your own territory";
       if (type === UnitType.Port && !this.stackTarget(player, type, tile) && !map.isShore(tile)) return "Docks must be built on the coast";
+      if (type === UnitType.CoastalBattery && !this.stackTarget(player, type, tile) && !map.isShore(tile)) return "Coastal Batteries must be built on the coast";
       const here = this.structuresAt(tile);
       if (here.length >= this.config.maxStack() && !here.some((u) => u.type === type)) return "Stack is full";
       const same = this.stackTarget(player, type, tile);
@@ -1357,6 +1358,8 @@ export function unitLabel(t: UnitType): string {
       return "SAM Launcher";
     case UnitType.Radar:
       return "Radar";
+    case UnitType.CoastalBattery:
+      return "Coastal Battery";
     case UnitType.Warship:
       return "Warship";
     case UnitType.TransportShip:

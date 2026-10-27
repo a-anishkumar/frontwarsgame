@@ -410,6 +410,8 @@ export class Config {
         return Math.min(3_000_000, (n + 1) * 1_500_000);
       case UnitType.Radar:
         return Math.min(1_200_000, (n + 1) * 200_000);
+      case UnitType.CoastalBattery:
+        return Math.min(600_000, (n + 1) * 150_000);
       case UnitType.Warship:
         return Math.min(1_000_000, (n + 1) * 250_000);
       case UnitType.AtomBomb:
@@ -441,6 +443,8 @@ export class Config {
         return 1_500_000;
       case UnitType.Radar:
         return Math.min(800_000, (level + 1) * 200_000);
+      case UnitType.CoastalBattery:
+        return Math.min(800_000, (level + 1) * 200_000);
       default:
         return 0;
     }
@@ -458,6 +462,8 @@ export class Config {
       case UnitType.SAMLauncher:
         return 5;
       case UnitType.Radar:
+        return 3;
+      case UnitType.CoastalBattery:
         return 3;
       default:
         return 1;
@@ -594,9 +600,20 @@ export class Config {
         return 300;
       case UnitType.Radar:
         return 40;
+      case UnitType.CoastalBattery:
+        return 50;
       default:
         return 0;
     }
+  }
+  coastalBatteryRange(level: number): number {
+    return Math.max(1, Math.round(this.tiles(14 + (level - 1) * 5)));
+  }
+  coastalBatteryCooldown(level: number): number {
+    return Math.max(18, 40 - (level - 1) * 8);
+  }
+  coastalBatteryDamage(level: number, roll: number): number {
+    return roll + level * 2;
   }
   samCooldown(): number {
     return 90;
