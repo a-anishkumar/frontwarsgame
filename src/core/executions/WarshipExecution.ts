@@ -3,6 +3,8 @@ import type { Unit } from "../Unit";
 import { WaterPathfinder } from "../WaterPathfinder";
 import { moveAlongPath } from "../movement";
 import { MessageType, UnitType, type TileRef } from "../types";
+import { fmt } from "./AttackExecution";
+import { portWaterTile } from "./PortExecution";
 import { ShellExecution } from "./ShellExecution";
 
 /** Patrols around a home / ordered water tile; shells warships and boats; captures trade ships. */
@@ -55,7 +57,6 @@ export class WarshipExecution implements Execution {
     for (const o of this.game.units) {
       if (!o.active || o === this.unit) continue;
       if (o.type !== UnitType.TransportShip && o.type !== UnitType.TradeShip && o.type !== UnitType.Warship) continue;
-      if (o.type === UnitType.TradeShip && o.health === 2) continue;
       if (o.owner === this.unit.owner || this.unit.owner.isFriendly(o.owner)) continue;
       if (o.type === UnitType.TradeShip && o.targetUnit && o.targetUnit.owner === this.unit.owner) continue;
       const d = this.game.map.distSq(o.tile, this.unit.tile);
@@ -70,14 +71,22 @@ export class WarshipExecution implements Execution {
   private captureTrade(t: Unit): void {
     const game = this.game;
     const captor = this.unit.owner;
-    game.displayMessage(`Your trade ship was captured by ${captor.name}`, MessageType.Warn, t.owner.smallID);
-    if (captor.isHuman()) game.displayMessage(`Warship captured a trade ship of ${t.owner.name}`, MessageType.Info, captor.smallID);
-    t.owner.updateRelation(captor, -20);
+    const prevOwner = t.owner;
+    const plunder = 15000 + Math.floor(game.random.next() * 10000);
+    captor.addGold(plunder);
+
+    game.displayMessage(`Your trade ship was captured by ${captor.name}`, MessageType.Warn, prevOwner.smallID);
+    if (captor.isHuman()) {
+      game.displayMessage(`Warship captured enemy trade ship of ${prevOwner.name} (+${fmt(plunder)} gold)`, MessageType.Info, captor.smallID);
+    }
+    prevOwner.updateRelation(captor, -20);
     game.transferUnit(t, captor);
+
     const port = game.nearestPort(captor, t.tile);
     if (port) {
       t.targetUnit = port;
-      const path = this.pf.findPath(t.tile, port.tile, 30000);
+      const dstWater = portWaterTile(game.map, port.tile);
+      const path = this.pf.findPath(t.tile, dstWater, 30000);
       if (path) {
         t.path = path;
         t.pathIndex = 1;

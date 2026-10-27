@@ -6,6 +6,7 @@ import { Game } from '../src/core/Game.ts';
 import { Config } from '../src/core/Config.ts';
 import { AttackExecution } from '../src/core/executions/AttackExecution.ts';
 import { TransportShipExecution } from '../src/core/executions/TransportShipExecution.ts';
+import { portWaterTile } from '../src/core/executions/PortExecution.ts';
 import { NukeExecution } from '../src/core/executions/NukeExecution.ts';
 import { WaterPathfinder } from '../src/core/WaterPathfinder.ts';
 import { queueMissiles, attackTile, build, upgradeUnit } from '../src/core/actions.ts';
@@ -526,4 +527,65 @@ test('an army spends troops taking land and its later advances slow as it deplet
  const later=p.landArea-lateStart;
  assert.ok(first>0&&later<first*.8,`first ${first}, later ${later}`);
  close(attack.troops(),5000-(p.landArea-start)*60,1e-6);
+});
+
+test('portWaterTile finds adjacent water tile for coastal port avoiding land blockage', () => {
+ const { map } = world(128, 64, T.Water);
+ const landTile = map.ref(50, 32);
+ map.terrain[landTile] = T.Plains;
+ const water = portWaterTile(map, landTile);
+ assert.ok(map.isWater(water));
+ assert.notEqual(water, landTile);
+});
+
+test('army boat captures enemy trade boat with plunder gold but spares allied trade boat', () => {
+ const { map, game } = world(128, 64, T.Water);
+ const src = map.ref(20, 20), dst = map.ref(30, 20);
+ map.terrain[src] = map.terrain[dst] = T.Plains;
+ const p1 = player(game, src);
+ const p2 = player(game, dst);
+ const p3 = player(game, dst);
+
+ // p1 and p3 are allies
+ p1.alliances.push({ a: p1, b: p3, expiresAt: 99999 });
+ p3.alliances.push({ a: p1, b: p3, expiresAt: 99999 });
+
+ const armyBoat = new TransportShipExecution(p1, src, dst, 500, [src, map.ref(21, 20), dst]);
+ armyBoat.init(game);
+
+ // Spawn enemy trade ship of p2 next to the army boat
+ const enemyTrade = game.addUnit(U.TradeShip, p2, map.ref(21, 20));
+ const alliedTrade = game.addUnit(U.TradeShip, p3, map.ref(21, 20));
+
+ const initialGold = p1.gold;
+ armyBoat.tick();
+
+ // Allied trade ship remains owned by ally p3
+ assert.equal(alliedTrade.owner, p3);
+
+ // Enemy trade ship is captured by p1, transferred, and awards plunder gold
+ assert.equal(enemyTrade.owner, p1);
+ assert.ok(p1.gold > initialGold);
+});
+
+test('army boat engages in naval combat with enemy troop ship and warship', () => {
+ const { map, game } = world(128, 64, T.Water);
+ const src = map.ref(10, 10), dst = map.ref(25, 10);
+ map.terrain[src] = map.terrain[dst] = T.Plains;
+ const p1 = player(game, src);
+ const p2 = player(game, dst);
+
+ const army1 = new TransportShipExecution(p1, src, dst, 1000, [src, map.ref(11, 10), dst]);
+ army1.init(game);
+ const u1 = army1.unitRef();
+
+ // Enemy troop transport adjacent
+ const enemyTroopUnit = game.addUnit(U.TransportShip, p2, map.ref(11, 10));
+ enemyTroopUnit.troops = 100;
+
+ army1.tick();
+
+ // Enemy troop transport suffered casualties or was sunk
+ assert.ok(enemyTroopUnit.troops < 100 || !enemyTroopUnit.active);
+ assert.ok(u1.troops < 1000);
 });

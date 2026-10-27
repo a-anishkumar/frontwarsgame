@@ -497,10 +497,10 @@ export class NationAI implements Execution {
         if (this.tryBuild(UnitType.DefensePost, tile)) return;
       }
     }
-    // Port
+    // Port: coastal nations build docks to establish maritime trade and warships
     const ports = p.unitCount(UnitType.Port);
     const portCost = cfg.unitCost(UnitType.Port, game.ownedForCost(p, UnitType.Port));
-    if (p.gold >= portCost * 1.2 && ports < 1 + Math.floor(refTiles / 8000) && cities >= 1 && this.random.chance(2)) {
+    if (p.gold >= portCost && ports < 1 + Math.floor(refTiles / 4000) && this.random.chance(25)) {
       const shore = game.shoreTiles(p);
       if (shore.length) {
         for (let i = 0; i < 6; i++) {

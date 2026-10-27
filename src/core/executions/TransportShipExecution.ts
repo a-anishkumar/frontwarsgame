@@ -4,7 +4,8 @@ import type { Player } from "../Player";
 import type { Unit } from "../Unit";
 import { moveAlongPath } from "../movement";
 import { MessageType, UnitType, type TileRef } from "../types";
-import { AttackExecution, fmtTroops } from "./AttackExecution";
+import { AttackExecution, fmt, fmtTroops } from "./AttackExecution";
+import { portWaterTile } from "./PortExecution";
 
 const nearBuf: TileRef[] = [0, 0, 0, 0];
 
@@ -68,6 +69,110 @@ export class TransportShipExecution implements Execution {
     return this.unit;
   }
 
+  private interactNaval(): boolean {
+    const u = this.unit;
+    if (!u || !u.active || u.troops <= 0) return false;
+    const game = this.game;
+    const map = game.map;
+    const rSq = map.tiles(5) ** 2;
+
+    for (const o of game.units) {
+      if (!o.active || o === u) continue;
+      // Never capture or battle own units or alliance nation units
+      if (o.owner === this.owner || this.owner.isFriendly(o.owner)) continue;
+
+      const d2 = map.distSq(u.tile, o.tile);
+      if (d2 > rSq) continue;
+
+      // 1. Capture enemy Trade Ship (except alliance nation boat)
+      if (o.type === UnitType.TradeShip) {
+        this.captureEnemyTradeShip(o);
+        continue;
+      }
+
+      // 2. Battle enemy Transport Ship (troop ship vs troop ship skirmish)
+      if (o.type === UnitType.TransportShip) {
+        const dmgToEnemy = Math.max(1, Math.floor(u.troops * 0.1 + 25));
+        const dmgToSelf = Math.max(1, Math.floor(o.troops * 0.1 + 25));
+        o.troops = Math.max(0, o.troops - dmgToEnemy);
+        u.troops = Math.max(0, u.troops - dmgToSelf);
+
+        if (o.troops <= 0) {
+          game.removeUnit(o);
+          if (this.owner.isHuman()) {
+            game.displayMessage("Naval skirmish victory! Enemy troop ship sunk.", MessageType.Info, this.owner.smallID);
+          }
+          if (o.owner.isHuman()) {
+            game.displayMessage(`Your troop ship was intercepted and sunk by ${this.owner.name}!`, MessageType.Warn, o.owner.smallID);
+          }
+        }
+        if (u.troops <= 0) {
+          game.removeUnit(u);
+          this.active = false;
+          if (this.owner.isHuman()) {
+            game.displayMessage("Your troop ship was defeated and sunk in naval combat!", MessageType.Warn, this.owner.smallID);
+          }
+          return true;
+        }
+        continue;
+      }
+
+      // 3. Battle enemy Warship (troop ship troops engage warship)
+      if (o.type === UnitType.Warship) {
+        const casualties = Math.max(1, Math.floor(u.troops * 0.08 + 35));
+        u.troops = Math.max(0, u.troops - casualties);
+        if (game.ticks % 3 === 0) {
+          o.health = Math.max(0, o.health - 1);
+        }
+        if (o.health <= 0) {
+          game.removeUnit(o);
+          if (this.owner.isHuman()) {
+            game.displayMessage("Your army boat boarded and sank an enemy warship!", MessageType.Info, this.owner.smallID);
+          }
+          if (o.owner.isHuman()) {
+            game.displayMessage(`Warship sunk in battle against ${this.owner.name}'s army boat!`, MessageType.Warn, o.owner.smallID);
+          }
+        }
+        if (u.troops <= 0) {
+          game.removeUnit(u);
+          this.active = false;
+          if (this.owner.isHuman()) {
+            game.displayMessage("Your troop ship was destroyed by an enemy warship!", MessageType.Warn, this.owner.smallID);
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private captureEnemyTradeShip(t: Unit): void {
+    const game = this.game;
+    const captor = this.owner;
+    const prevOwner = t.owner;
+    const plunder = 15000 + Math.floor(game.random.next() * 10000);
+    captor.addGold(plunder);
+
+    game.displayMessage(`Your trade ship was captured by ${captor.name}`, MessageType.Warn, prevOwner.smallID);
+    if (captor.isHuman()) {
+      game.displayMessage(`Army boat captured enemy trade ship of ${prevOwner.name} (+${fmt(plunder)} gold)`, MessageType.Info, captor.smallID);
+    }
+    prevOwner.updateRelation(captor, -20);
+    game.transferUnit(t, captor);
+
+    const port = game.nearestPort(captor, t.tile);
+    if (port) {
+      t.targetUnit = port;
+      const dstWater = portWaterTile(game.map, port.tile);
+      const path = game.waterPathfinder.findPath(t.tile, dstWater, 25000);
+      if (path) {
+        t.path = path;
+        t.pathIndex = 1;
+      }
+    }
+    if (this.unit) this.unit.recordTradeCapture();
+  }
+
   tick(): void {
     const u = this.unit;
     if (!u || !u.active) {
@@ -80,6 +185,12 @@ export class TransportShipExecution implements Execution {
       return;
     }
     if (u.retreatOrdered && !this.returning) this.retreat();
+
+    // Naval interactions: combat vs enemy warships & troop transports; capturing enemy trade ships
+    if (this.game.ticks % 2 === 0) {
+      if (this.interactNaval()) return;
+    }
+
     const map = this.game.map;
     const arrived = moveAlongPath(u, this.game.config.boatSpeed(), map);
     // Land as soon as the hull is on water next to the beach — don't wait for
