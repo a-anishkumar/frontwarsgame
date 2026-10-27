@@ -113,8 +113,10 @@ export function sendBoat(game: Game, player: Player, dst: TileRef, troops: numbe
   const amount = Math.floor(troops);
   if (amount < 1) return { ok: false, message: "Not enough troops" };
   shore.sort((a, b) => map.distSq(a, dst) - map.distSq(b, dst));
-  let remainingSearch = 40000;
-  for (let i = 0; i < Math.min(12, shore.length) && remainingSearch > 0; i++) {
+  const isBot = player.isAI();
+  let remainingSearch = isBot ? 3500 : 40000;
+  const maxChecks = isBot ? 3 : 12;
+  for (let i = 0; i < Math.min(maxChecks, shore.length) && remainingSearch > 0; i++) {
     const src = shore[i];
     const path = game.waterPathfinder.findPath(src, dst, remainingSearch);
     remainingSearch -= Math.max(1, game.waterPathfinder.lastSearchWork);

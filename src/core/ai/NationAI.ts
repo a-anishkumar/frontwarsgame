@@ -27,6 +27,7 @@ export class NationAI implements Execution {
   private firstAttackSent = false;
   private lastNukeAt = -Infinity;
   private lastEmojiAt = 0;
+  private lastBoatTick = -Infinity;
 
   constructor(
     readonly player: Player,
@@ -317,15 +318,18 @@ export class NationAI implements Execution {
   private attackWithRandomBoat(borderingEnemies: Player[] = []): void {
     const game = this.game;
     const p = this.p;
+    if (game.ticks - this.lastBoatTick < 120) return; // at most 1 attempt every 12 seconds per nation
     if (p.unitCount(UnitType.TransportShip) >= game.config.boatMaxNumber()) return;
     const shore = game.shoreTiles(p);
     if (shore.length === 0) return;
+    this.lastBoatTick = game.ticks;
+
     const src = this.random.randElement(shore);
     const map = game.map;
     const x = map.x(src);
     const y = map.y(src);
-    for (let i = 0; i < 150; i++) {
-      const R = map.tiles(150);
+    for (let i = 0; i < 18; i++) {
+      const R = map.tiles(120);
       const t = map.refWrapped(x + this.random.nextInt(-R, R), y + this.random.nextInt(-R, R));
       if (t < 0 || !map.isLand(t) || !map.isShore(t)) continue;
       const owner = game.ownerAt(t);
@@ -335,9 +339,11 @@ export class NationAI implements Execution {
       if (owner && owner.isHuman() && game.ticks - owner.spawnedAt < game.config.spawnImmunityTicks()) continue;
       const troops = Math.min(p.troops / 5, Math.max(0, p.troops - this.maxPop() * this.reserveRatio));
       if (troops < 200) return;
-      sendBoat(game, p, t, troops);
-      if (owner?.isHuman() && !p.embargoes.has(owner.smallID)) game.setEmbargo(p, owner, true);
-      return;
+      const res = sendBoat(game, p, t, troops);
+      if (res.ok) {
+        if (owner?.isHuman() && !p.embargoes.has(owner.smallID)) game.setEmbargo(p, owner, true);
+        return;
+      }
     }
   }
 

@@ -426,23 +426,77 @@ export class FlatRenderer {
     this.rebuildFullImage();
   }
 
+  private countryTileIndex: number[][] | null = null;
+  private game?: any;
+
+  bindGame(game: any): void {
+    this.game = game;
+  }
+
+  private buildCountryTileIndex(): void {
+    const num = this.map.countries.length;
+    this.countryTileIndex = Array.from({ length: num }, () => [] as number[]);
+    const map = this.map;
+    for (let t = 0, n = map.width * map.height; t < n; t++) {
+      const c = map.country[t];
+      if (c > 0 && c < num) {
+        this.countryTileIndex[c].push(t);
+      }
+    }
+  }
+
   setHover(ownerId: number, countryId: number): void {
     if (this.hoverOwner === ownerId && this.hoverCountry === countryId) return;
     const prevOwner = this.hoverOwner;
     const prevCountry = this.hoverCountry;
     this.hoverOwner = ownerId;
     this.hoverCountry = countryId;
-    // repaint affected tiles
+
+    let minX = this.map.width, maxX = -1, minY = this.map.height, maxY = -1;
+    let count = 0;
     const map = this.map;
-    const n = map.width * map.height;
-    for (let t = 0; t < n; t++) {
-      const o = map.owner[t];
-      const c = map.country[t];
-      if (o === prevOwner || o === ownerId || (o === 0 && (c === prevCountry || c === countryId))) {
-        this.paintTilePixel(t);
+
+    const touch = (t: number) => {
+      this.paintTilePixel(t);
+      const x = map.x(t);
+      const y = map.y(t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      count++;
+    };
+
+    // Fast selective update using player tile sets
+    if (this.game) {
+      if (prevOwner > 0) {
+        const p = this.game.player(prevOwner);
+        if (p?.tiles) for (const t of p.tiles) touch(t);
+      }
+      if (ownerId > 0) {
+        const p = this.game.player(ownerId);
+        if (p?.tiles) for (const t of p.tiles) touch(t);
       }
     }
-    this.flushImageRect(0, 0, map.width - 1, map.height - 1);
+
+    // Country hover on unowned land
+    if (prevCountry > 0 || countryId > 0) {
+      if (!this.countryTileIndex) this.buildCountryTileIndex();
+      if (prevCountry > 0 && this.countryTileIndex?.[prevCountry]) {
+        for (const t of this.countryTileIndex[prevCountry]) {
+          if (map.owner[t] === 0) touch(t);
+        }
+      }
+      if (countryId > 0 && this.countryTileIndex?.[countryId]) {
+        for (const t of this.countryTileIndex[countryId]) {
+          if (map.owner[t] === 0) touch(t);
+        }
+      }
+    }
+
+    if (count > 0 && minX <= maxX && minY <= maxY) {
+      this.flushImageRect(minX, minY, maxX, maxY);
+    }
   }
 
   setFrontTiles(outgoing: Iterable<number>, incoming: Iterable<number>): void {
@@ -458,21 +512,50 @@ export class FlatRenderer {
     this.previousIn = nextInc;
     const flags = this.frontFlags;
     const keep = new Set([...nextOut, ...nextInc]);
+
+    let minX = this.map.width, maxX = -1, minY = this.map.height, maxY = -1;
+    const touch = (t: number) => {
+      this.paintTilePixel(t);
+      const x = this.map.x(t);
+      const y = this.map.y(t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+
     for (const t of this.frontList) {
-      if (!keep.has(t)) { flags[t] &= ~(FLAG_FRONT_OUT | FLAG_FRONT_IN); this.paintTilePixel(t); }
+      if (!keep.has(t)) { flags[t] &= ~(FLAG_FRONT_OUT | FLAG_FRONT_IN); touch(t); }
     }
     this.frontList.length = 0;
-    for (const t of nextOut) { flags[t] = (flags[t] & ~FLAG_FRONT_IN) | FLAG_FRONT_OUT; this.paintTilePixel(t); this.frontList.push(t); }
-    for (const t of nextInc) { flags[t] = (flags[t] & ~FLAG_FRONT_OUT) | FLAG_FRONT_IN; this.paintTilePixel(t); this.frontList.push(t); }
-    this.flushImageRect(0, 0, this.map.width - 1, this.map.height - 1);
+    for (const t of nextOut) { flags[t] = (flags[t] & ~FLAG_FRONT_IN) | FLAG_FRONT_OUT; touch(t); this.frontList.push(t); }
+    for (const t of nextInc) { flags[t] = (flags[t] & ~FLAG_FRONT_OUT) | FLAG_FRONT_IN; touch(t); this.frontList.push(t); }
+
+    if (minX <= maxX && minY <= maxY) {
+      this.flushImageRect(minX, minY, maxX, maxY);
+    }
   }
 
   setPreviewTiles(tiles: Iterable<number>): void {
     const flags = this.frontFlags;
-    for (const t of this.previewList) { flags[t] &= ~FLAG_PREVIEW; this.paintTilePixel(t); }
+    let minX = this.map.width, maxX = -1, minY = this.map.height, maxY = -1;
+    const touch = (t: number) => {
+      this.paintTilePixel(t);
+      const x = this.map.x(t);
+      const y = this.map.y(t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+
+    for (const t of this.previewList) { flags[t] &= ~FLAG_PREVIEW; touch(t); }
     this.previewList.length = 0;
-    for (const t of tiles) { flags[t] |= FLAG_PREVIEW; this.paintTilePixel(t); this.previewList.push(t); }
-    this.flushImageRect(0, 0, this.map.width - 1, this.map.height - 1);
+    for (const t of tiles) { flags[t] |= FLAG_PREVIEW; touch(t); this.previewList.push(t); }
+
+    if (minX <= maxX && minY <= maxY) {
+      this.flushImageRect(minX, minY, maxX, maxY);
+    }
   }
 
   setRailGhost(tiles: Iterable<RailGhostTile>, overlap: Iterable<number> = []): void {
@@ -487,20 +570,35 @@ export class FlatRenderer {
     }
     const flags = this.frontFlags;
     const ghost = this.ghostRail;
-    for (const t of this.ghostList) { ghost[t] = 0; flags[t] &= ~FLAG_PREVIEW; this.paintTilePixel(t); }
+
+    let minX = this.map.width, maxX = -1, minY = this.map.height, maxY = -1;
+    const touch = (t: number) => {
+      this.paintTilePixel(t);
+      const x = map.x(t);
+      const y = map.y(t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+
+    for (const t of this.ghostList) { ghost[t] = 0; flags[t] &= ~FLAG_PREVIEW; touch(t); }
     this.ghostList.length = 0;
     for (const { ref, type } of list) {
       if (map.railType[ref] > 0) flags[ref] |= FLAG_PREVIEW;
       else ghost[ref] = type;
-      this.paintTilePixel(ref);
+      touch(ref);
       this.ghostList.push(ref);
     }
     for (const t of overlapping) {
       if (map.railType[t] > 0) flags[t] |= FLAG_PREVIEW;
-      this.paintTilePixel(t);
+      touch(t);
       this.ghostList.push(t);
     }
-    this.flushImageRect(0, 0, map.width - 1, map.height - 1);
+
+    if (minX <= maxX && minY <= maxY) {
+      this.flushImageRect(minX, minY, maxX, maxY);
+    }
   }
 
   /** Called by game when a tile sinks (nuke water). Dirty sync handles it. */
@@ -631,13 +729,6 @@ export class FlatRenderer {
     // Unit layer (units, rails, range circles, ghosts, pings, multi-stage explosions, missiles, ship wakes)
     this.unitLayer?.render(ctx);
 
-    // Atmospheric command center radial vignette
-    const vig = ctx.createRadialGradient(cW / 2, cH / 2, Math.min(cW, cH) * 0.44, cW / 2, cH / 2, Math.max(cW, cH) * 0.78);
-    vig.addColorStop(0, "rgba(0, 0, 0, 0)");
-    vig.addColorStop(1, "rgba(3, 7, 16, 0.48)");
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, cW, cH);
-
     // High-tech cybernetic minimap
     this.drawMinimap(ctx, cW, cH);
   }
@@ -650,18 +741,14 @@ export class FlatRenderer {
 
     ctx.save();
 
-    // 1. Soft glass backdrop shadow
-    ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 4;
-    ctx.fillStyle = "rgba(10, 16, 28, 0.9)";
+    // 1. High-tech clean glass container backdrop
+    ctx.fillStyle = "rgba(10, 16, 28, 0.92)";
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(mx - 3, my - 3, mm + 6, mmH + 6, 6);
+    ctx.roundRect(mx - 2, my - 2, mm + 4, mmH + 4, 4);
     ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = "transparent";
+    ctx.stroke();
 
     // 2. Map contents clipped inside rounded container
     ctx.save();

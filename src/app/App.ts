@@ -106,6 +106,7 @@ export class App {
     const game = online?.game ?? createGame(this.map, settings);
     this.online = online?.client ?? null;
     this.game = game;
+    this.globe.bindGame(game);
     const human = game.human!;
     game.onTerrainSunk = (t) => this.globe.paintSunk(t);
     for (const p of game.allPlayers()){
