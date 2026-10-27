@@ -4,7 +4,8 @@ import { PseudoRandom } from "../PseudoRandom";
 import type { Unit } from "../Unit";
 import { build, sendBoat } from "../actions";
 import { AttackExecution } from "../executions/AttackExecution";
-import { Difficulty, PlayerType, Relation, UnitType, type TileRef } from "../types";
+import { Difficulty, MessageType, PlayerType, Relation, UnitType, type TileRef } from "../types";
+import { countryFlag } from "./aiNames";
 
 const EMOJIS_ATTACK = ["⚔️", "😈", "🔥", "💀", "👊"];
 const EMOJIS_CASUAL = ["👋", "🙂", "🤝", "🌍", "☕"];
@@ -28,6 +29,8 @@ export class NationAI implements Execution {
   private lastNukeAt = -Infinity;
   private lastEmojiAt = 0;
   private lastBoatTick = -Infinity;
+  private lastPingResponded = -Infinity;
+  private surrendered = false;
 
   constructor(
     readonly player: Player,
@@ -202,6 +205,38 @@ export class NationAI implements Execution {
     if (incoming) {
       this.sendAttack(incoming, true);
       return;
+    }
+
+    // Interactive tactical ping cooperation with allies
+    if (game.tacticalPing && game.ticks - game.tacticalPing.tick < 50 && p.isFriendly(game.tacticalPing.player) && game.tacticalPing.player !== p) {
+      if (this.lastPingResponded !== game.tacticalPing.tick) {
+        this.lastPingResponded = game.tacticalPing.tick;
+        const pingTile = game.tacticalPing.tile;
+        const targetOwner = game.ownerAt(pingTile);
+        if (targetOwner && !p.isFriendly(targetOwner)) {
+          game.displayMessage(`${countryFlag(p.name)} [${p.name}] Tactical objective acknowledged! Directing strike force to pinged coordinates.`, MessageType.Info);
+          if (enemies.includes(targetOwner)) {
+            this.sendAttack(targetOwner, true);
+            return;
+          } else {
+            const troops = Math.min(p.troops / 4, Math.max(0, p.troops - this.maxPop() * this.reserveRatio));
+            if (troops >= 150) {
+              sendBoat(game, p, pingTile, troops);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Surrender proposal when overwhelmed
+    const maxPop = this.maxPop();
+    if (!this.surrendered && p.troops / maxPop < 0.12 && p.numTiles < 120 && game.ticks > 400) {
+      const human = game.human;
+      if (human && enemies.includes(human) && this.random.chance(12)) {
+        this.surrendered = true;
+        game.displayMessage(`${countryFlag(p.name)} [${p.name}] We are broken! Commander, we offer unconditional surrender!`, MessageType.Warn);
+      }
     }
     this.maybeSendAllianceRequests(enemies);
     this.attackBestTarget([], enemies);

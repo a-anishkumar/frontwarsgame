@@ -170,11 +170,17 @@ export class FlatRenderer {
   readonly camera = {};
 
   readonly map: GameMap;
-  private unitLayer?: { render(ctx: CanvasRenderingContext2D): void };
+  private unitLayer?: {
+    render(ctx: CanvasRenderingContext2D): void;
+    activeTacticalPings?(): { tile: TileRef; color: string; label?: string }[];
+  };
 
   get zoom(): number { return this._zoom; }
 
-  setUnitLayer(layer: { render(ctx: CanvasRenderingContext2D): void }): void {
+  setUnitLayer(layer: {
+    render(ctx: CanvasRenderingContext2D): void;
+    activeTacticalPings?(): { tile: TileRef; color: string; label?: string }[];
+  }): void {
     this.unitLayer = layer;
   }
 
@@ -839,6 +845,25 @@ export class FlatRenderer {
     ctx.font = "bold 8px monospace";
     ctx.fillStyle = "#e0e6ed";
     ctx.fillText("RADAR", mx + 15, my + 14.5);
+
+    // 7. Active tactical pings on minimap
+    const activePings = this.unitLayer?.activeTacticalPings?.();
+    if (activePings && activePings.length) {
+      const pulse = (Math.sin(now * 0.012) + 1) * 0.5;
+      for (const p of activePings) {
+        const px = mx + (this.map.x(p.tile) / this.map.width) * mm;
+        const py = my + (this.map.y(p.tile) / this.map.height) * mmH;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px, py, 3 + 3.5 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     ctx.restore();
   }

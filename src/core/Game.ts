@@ -22,6 +22,7 @@ import {
   type PlayerID,
   type TileRef,
 } from "./types";
+import { countryFlag } from "./ai/aiNames";
 
 export interface Execution {
   init(game: Game): void;
@@ -84,6 +85,9 @@ export class Game {
   onAllianceBroken: ((breaker: Player, other: Player) => void) | null = null;
   onConstructionComplete: ((u: Unit) => void) | null = null;
   onBorderAssault: ((tile: TileRef, color: string) => void) | null = null;
+  onTacticalPing: ((tile: TileRef, color: string, label: string) => void) | null = null;
+  /** Active strategic map ping for player-bot and player-player coordination */
+  tacticalPing: { tile: TileRef; player: Player; tick: number; label: string } | null = null;
   /** when true, nation/bot AI does not act (dev mode) */
   devFreezeAi = false;
 
@@ -1134,6 +1138,9 @@ export class Game {
     for (const p of this.allPlayers()) if (p !== breaker && p !== other) p.updateRelation(breaker, -20);
     this.displayMessage(`You betrayed ${other.name} and are marked as a traitor`, MessageType.Warn, breaker.smallID);
     this.displayMessage(`${breaker.name} betrayed you!`, MessageType.Error, other.smallID);
+    if (other.type === PlayerType.Bot) {
+      this.displayMessage(`${countryFlag(other.name)} [${other.name}] Traitor! The alliance is shattered. All nations will know your dishonor!`, MessageType.Warn);
+    }
     this.onAllianceBroken?.(breaker, other);
   }
 
@@ -1179,6 +1186,9 @@ export class Game {
     to.addTroops(amount);
     to.updateRelation(from, 25);
     this.displayMessage(`${from.name} sent you ${fmtTroops(amount)} troops`, MessageType.Success, to.smallID);
+    if (to.type === PlayerType.Bot && from.isHuman()) {
+      this.displayMessage(`${countryFlag(to.name)} [${to.name}] Reinforcements received from Commander! Our frontline holds.`, MessageType.Success);
+    }
     return true;
   }
   donateGold(from: Player, to: Player, amount: number): boolean {
@@ -1189,7 +1199,18 @@ export class Game {
     to.addGold(amount);
     to.updateRelation(from, 25);
     this.displayMessage(`${from.name} sent you ${fmt(amount)} gold`, MessageType.Success, to.smallID);
+    if (to.type === PlayerType.Bot && from.isHuman()) {
+      this.displayMessage(`${countryFlag(to.name)} [${to.name}] Financial aid received from Commander! Treasury bolstered.`, MessageType.Success);
+    }
     return true;
+  }
+
+  triggerTacticalPing(player: Player, tile: TileRef, label = "ATTACK OBJECTIVE"): void {
+    this.tacticalPing = { tile, player, tick: this.ticks, label };
+    this.onTacticalPing?.(tile, player.color, label);
+    if (player.isHuman()) {
+      this.displayMessage(`Tactical beacon placed: ${label}`, MessageType.Info, player.smallID);
+    }
   }
 
   sendEmoji(from: Player, to: Player | null, emoji: string): void {

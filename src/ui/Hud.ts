@@ -6,6 +6,7 @@ import { MessageType, UnitType, type GameEvent } from "../core/types";
 import { missileAlertsEnabled } from "./AlertFrame";
 import { clear, h } from "./dom";
 import { namedIcon } from "./icons";
+import { sound } from "../sound/SoundFX";
 
 export interface HudCallbacks {
   onRetreat(attackId: number): void;
@@ -21,6 +22,8 @@ export interface HudCallbacks {
   onFocusAttack(a: AttackExecution): void;
   onRetaliate(a?: AttackExecution): void;
   onHideUi(): void;
+  onTriggerPing?(): void;
+  onToggleSound?(): void;
 }
 
 interface EventItem {
@@ -50,6 +53,8 @@ export class Hud {
   private eventItems: EventItem[] = [];
   private eventCursor = 0;
   private pauseBtn: HTMLElement;
+  private soundBtn: HTMLElement;
+  private pingBtn: HTMLElement;
   private spawnHint: HTMLElement;
   private modeHint: HTMLElement;
   private emojiPop: HTMLElement;
@@ -64,9 +69,11 @@ export class Hud {
     this.progress = h("div", { class: "hud-progress" });
     this.progressBar = h("div", { class: "hud-goal-fill" });
     this.pauseBtn = h("button", { class: "icon-btn", onClick: () => cb.onTogglePause(), title: "Pause (P)" }, pauseIcon());
+    this.soundBtn = h("button", { class: "icon-btn sound-btn", onClick: () => { const m = sound.toggleMute(); this.soundBtn.textContent = m ? "🔇" : "🔊"; cb.onToggleSound?.(); }, title: "Toggle Sound (M)" }, sound.isMuted() ? "🔇" : "🔊");
+    this.pingBtn = h("button", { class: "icon-btn ping-btn", onClick: () => cb.onTriggerPing?.(), title: "Tactical Map Ping (G)" }, "🎯");
     const hideBtn = h("button", { class: "icon-btn", onClick: () => cb.onHideUi(), title: "Hide UI (\\)" }, "▭");
     if(game.online){this.pauseBtn.setAttribute("disabled","");this.pauseBtn.title="Online matches run at server speed";}
-    const topKids: Node[] = [this.timer, h("div", { class: "hud-goal" }, this.progress, h("div", { class: "hud-goal-track" }, this.progressBar)), this.pauseBtn, hideBtn];
+    const topKids: Node[] = [this.timer, h("div", { class: "hud-goal" }, this.progress, h("div", { class: "hud-goal-track" }, this.progressBar)), this.pingBtn, this.soundBtn, this.pauseBtn, hideBtn];
     if (game.isDev()) topKids.splice(2, 0, h("span", { class: "dev-badge", title: "` toggle cheats" }, "DEV"));
     const top = h("div", { class: "hud-top glass" }, ...topKids);
     this.spawnHint = h(
@@ -392,6 +399,12 @@ export class Hud {
 
   toast(text: string, type: MessageType = MessageType.Info): void {
     this.addEvent({ tick: this.game.ticks, type, text });
+  }
+
+  syncSoundBtn(): void {
+    if (this.soundBtn) {
+      this.soundBtn.textContent = sound.isMuted() ? "🔇" : "🔊";
+    }
   }
 
   destroy(): void {

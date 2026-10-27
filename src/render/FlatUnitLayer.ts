@@ -35,6 +35,8 @@ interface PingEffect {
   maxRadius: number;
   born: number;
   duration: number;
+  label?: string;
+  icon?: string;
 }
 
 interface ExplosionEffect {
@@ -120,14 +122,21 @@ export class FlatUnitLayer {
     });
   }
 
-  ping(tile: TileRef, color: string, radius = 16): void {
+  ping(tile: TileRef, color: string, radius = 16, label?: string, icon?: string): void {
     this.pings.push({
       tile,
       color,
       maxRadius: radius,
       born: performance.now(),
-      duration: 750,
+      duration: label ? 3500 : 750,
+      label,
+      icon,
     });
+  }
+
+  activeTacticalPings(): { tile: TileRef; color: string; label?: string }[] {
+    const now = performance.now();
+    return this.pings.filter((p) => p.label && now - p.born < p.duration);
   }
 
   spawnExplosion(tile: TileRef, type: UnitType): void {
@@ -1037,22 +1046,74 @@ export class FlatUnitLayer {
     const now = performance.now();
     ctx.save();
 
-    for (const p of this.pings) {
+    for (let i = this.pings.length - 1; i >= 0; i--) {
+      const p = this.pings[i];
       const elapsed = now - p.born;
-      if (elapsed >= p.duration) continue;
+      if (elapsed >= p.duration) {
+        this.pings.splice(i, 1);
+        continue;
+      }
       const progress = elapsed / p.duration;
       if (!this.globe.projectTile(p.tile, this.tempProj)) continue;
       const { x, y } = this.tempProj;
 
-      const r = (p.maxRadius * progress + 4) * Math.max(1, this.globe.zoom * 0.5);
-      const alpha = (1 - progress) * 0.9;
+      if (p.label) {
+        // High-visibility Tactical Sonar Beacon
+        const pulse = (Math.sin(elapsed * 0.008) + 1) * 0.5;
+        const waveR = (p.maxRadius * ((progress * 2) % 1) + 8) * Math.max(1, this.globe.zoom * 0.6);
+        const alpha = (1 - progress) * 0.95;
 
-      ctx.strokeStyle = p.color;
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth = Math.max(1.5, 3 * (1 - progress));
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.stroke();
+        // Expanding sonar pulse
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y, waveR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner glowing beacon ring
+        ctx.strokeStyle = "#ffffff";
+        ctx.globalAlpha = 0.8 + 0.2 * pulse;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(x, y, 10 + 4 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Center reticle
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Floating tactical objective badge
+        ctx.globalAlpha = Math.min(1, (1 - progress) * 1.5);
+        ctx.font = "bold 11px Outfit, Inter, system-ui, sans-serif";
+        const text = p.label;
+        const tw = ctx.measureText(text).width;
+        const bx = x - tw / 2 - 8;
+        const by = y - 28 - pulse * 4;
+
+        ctx.fillStyle = "rgba(10, 16, 28, 0.88)";
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + 16, 20, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, x - tw / 2, by + 14);
+      } else {
+        const r = (p.maxRadius * progress + 4) * Math.max(1, this.globe.zoom * 0.5);
+        const alpha = (1 - progress) * 0.9;
+
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = Math.max(1.5, 3 * (1 - progress));
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
 
     ctx.restore();

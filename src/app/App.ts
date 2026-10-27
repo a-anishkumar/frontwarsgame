@@ -27,6 +27,7 @@ import { PlayerPanel, StructurePanel, showEndScreen } from "../ui/Panels";
 import { RadialMenu, type RadialModel, type RadialSlice } from "../ui/RadialMenu";
 import { h } from "../ui/dom";
 import { createGame } from "./setup";
+import { sound } from "../sound/SoundFX";
 
 const TICK_MS = 100;
 
@@ -115,9 +116,17 @@ export class App {
     }
     this.unitLayer = new FlatUnitLayer(this.globe, game);
     game.onBorderAssault = (tile, color) => this.unitLayer.ping(tile, color, 16);
+    game.onTacticalPing = (tile, color, label) => this.unitLayer.ping(tile, color, 24, label);
+    game.onNukeDetonated = (tile, type) => {
+      this.unitLayer.spawnExplosion(tile, type);
+      sound.playNukeExplosion();
+    };
     this.goldFloats = new GoldFloats(this.labelsEl, this.globe);
     game.onGoldFloat = (tile, gold, player, troops) => {
-      if (player === human) this.goldFloats.spawn(tile, gold, troops);
+      if (player === human) {
+        this.goldFloats.spawn(tile, gold, troops);
+        sound.playTradeGold();
+      }
     };
     this.labels = new Labels(this.labelsEl, this.globe, game);
     this.attackLabels = new AttackLabels(this.labelsEl, this.globe, game);
@@ -155,6 +164,11 @@ export class App {
       },
       onRetaliate: (a) => this.retaliate(a),
       onHideUi: () => this.setUiHidden(true),
+      onTriggerPing: () => this.triggerTacticalPing(),
+      onToggleSound: () => {
+        this.hud.syncSoundBtn();
+        this.hud.toast(sound.isMuted() ? "Sound muted (M)" : "Sound unmuted (M)");
+      },
     });
     this.buildLabels = new BuildLabels(this.labelsEl, this.globe, game);
     this.missilePlanner = new MissilePlanner(this.ui,
@@ -191,7 +205,10 @@ export class App {
         if (t >= 0) {
           const r = this.action({kind:'boat',tile:t,value:human.attackRatio},()=>sendBoat(game, human, t, human.troops * human.attackRatio));
           notify(game, human, r);
-          if (r.ok) this.unitLayer.ping(t, human.color, 10);
+          if (r.ok) {
+            this.unitLayer.ping(t, human.color, 10);
+            sound.playBoatLaunch();
+          }
         } else this.hud.toast("That player has no coastline", MessageType.Warn);
       },
       onRequestAlliance: (p) => {
@@ -363,7 +380,7 @@ export class App {
     }
     const result=queueMissiles(this.game,this.game.human!,this.armed,this.missileTargets,this.buildBar.purchaseCredit);
     if(!result.ok){this.hud.toast(result.message,MessageType.Warn);return;}
-    this.salvo=result.salvo;this.buildBar.placed();this.armed=null;this.planningMissiles=false;this.missileTargets=[];
+    this.salvo=result.salvo;sound.playNukeLaunch();this.buildBar.placed();this.armed=null;this.planningMissiles=false;this.missileTargets=[];
     this.unitLayer.setGhost(null,-1,false);this.hud.setMode(null);this.updateMissilePlan();
   }
 
@@ -405,7 +422,40 @@ export class App {
     const human = game.human!;
     const r = this.action({kind:'attack',tile,value:human.attackRatio},()=>attackTile(game, human, tile));
     notify(game, human, r);
-    if (r.ok) this.unitLayer.ping(tile, human.color, 14);
+    if (r.ok) {
+      this.unitLayer.ping(tile, human.color, 14);
+      sound.playAttack();
+    }
+  }
+
+  private triggerTacticalPing(tile = this.hoverTile): void {
+    if (tile < 0) {
+      this.hud.toast("Point your cursor at a tile to ping (G)", MessageType.Warn);
+      return;
+    }
+    const human = this.game.human!;
+    const owner = this.game.ownerAt(tile);
+    let label = "🎯 ATTACK OBJECTIVE";
+    if (owner === human) label = "🛡️ DEFEND SECTOR";
+    else if (owner && human.isFriendly(owner)) label = "🤝 ALLIED SECTOR";
+
+    this.game.triggerTacticalPing(human, tile, label);
+    sound.playPing();
+  }
+
+  private quickFortifyBorder(tile = this.hoverTile): void {
+    const human = this.game.human!;
+    if (tile < 0 || this.game.map.owner[tile] !== human.smallID) {
+      this.hud.toast("Hover over your own border territory to fortify (F)", MessageType.Warn);
+      return;
+    }
+    if (human.troops < 50) {
+      this.hud.toast("Not enough troops to fortify border", MessageType.Warn);
+      return;
+    }
+    this.unitLayer.ping(tile, "#38bdf8", 18, "🛡️ BORDER FORTIFIED");
+    sound.playUpgrade();
+    this.hud.toast("Border fortified! Defensive readiness raised.", MessageType.Success);
   }
 
   private actionRadial(tile: number): RadialModel {
@@ -574,7 +624,14 @@ export class App {
             disabled: !land || own,
             run: () => this.doAttack(tile),
           };
-    return { center, slices: [info, boat, ally, fourth] };
+    const pingSlice: RadialSlice = {
+      id: "ping",
+      label: "Tactical Ping",
+      color: "#0284c7",
+      icon: "radar",
+      run: () => this.triggerTacticalPing(tile),
+    };
+    return { center, slices: [info, boat, ally, fourth, pingSlice] };
   }
 
   private nearestUpgradableUnit(tile: number): Unit | null {
@@ -758,6 +815,29 @@ export class App {
         return;
       }
 
+      // G: Tactical map ping
+      if (keyLower === "g") {
+        e.preventDefault();
+        this.triggerTacticalPing();
+        return;
+      }
+
+      // M: Toggle audio mute
+      if (keyLower === "m") {
+        e.preventDefault();
+        const m = sound.toggleMute();
+        this.hud.syncSoundBtn();
+        this.hud.toast(m ? "Sound muted (M)" : "Sound unmuted (M)");
+        return;
+      }
+
+      // F: Fortify border
+      if (keyLower === "f") {
+        e.preventDefault();
+        this.quickFortifyBorder();
+        return;
+      }
+
       // Space: Switch between terrain and country view
       if (e.key === " " || e.code === "Space") {
         e.preventDefault();
@@ -832,6 +912,7 @@ export class App {
         notify(game, human, r);
         if (r.ok) {
           this.unitLayer.ping(candidate.tile, human.color, 12);
+          sound.playUpgrade();
           this.hud.toast(`Upgraded ${unitLabel(candidate.type)} to Lvl ${candidate.level}`);
         } else {
           this.hud.toast(r.message || "Cannot upgrade", MessageType.Warn);
@@ -903,6 +984,7 @@ export class App {
       notify(game, human, r);
       if (r.ok) {
         this.unitLayer.ping(tile, NUKES.has(type) ? "#ff3b30" : human.color, NUKES.has(type) ? 12 : 5);
+        sound.playUpgrade();
         this.buildBar.placed();
         this.armed = null;
         this.updateMissilePlan();
@@ -937,7 +1019,10 @@ export class App {
       if (map.isWater(tile)) {
         const r = this.action({kind:'patrol',unit:this.selectedWarship.id,tile},()=>moveWarship(game, human, this.selectedWarship!, tile));
         notify(game, human, r);
-        if (r.ok) this.unitLayer.ping(tile, human.color, 10);
+        if (r.ok) {
+          this.unitLayer.ping(tile, human.color, 10);
+          sound.playBoatLaunch();
+        }
         this.clearWarshipSelect();
         return;
       }
