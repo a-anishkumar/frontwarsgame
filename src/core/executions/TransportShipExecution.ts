@@ -101,6 +101,7 @@ export class TransportShipExecution implements Execution {
         );
       }
       this.owner.addTroops(keep);
+      u.beached = true;
       this.game.removeUnit(u);
       this.active = false;
       return;
@@ -119,6 +120,7 @@ export class TransportShipExecution implements Execution {
         );
       }
     }
+    u.beached = true;
     this.game.removeUnit(u);
     this.active = false;
   }

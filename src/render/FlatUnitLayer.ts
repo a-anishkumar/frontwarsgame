@@ -8,6 +8,7 @@ import type { Game } from "../core/Game";
 import type { Unit } from "../core/Unit";
 import { NUKES, STRUCTURES, UnitType, type TileRef } from "../core/types";
 import { paintStructureMark, paintOwnerGlyph, shade } from "../ui/icons";
+import { fmt, fmtTroops } from "../core/executions/AttackExecution";
 import type { FlatRenderer } from "./FlatRenderer";
 
 let trainSpritesReady = true;
@@ -15,6 +16,17 @@ const trainSpritesCallbacks: (() => void)[] = [];
 export function whenTrainSpritesReady(cb: () => void): void {
   if (trainSpritesReady) cb();
   else trainSpritesCallbacks.push(cb);
+}
+
+interface SinkingShipEffect {
+  tile: TileRef;
+  x: number;
+  y: number;
+  heading: number;
+  type: UnitType;
+  ownerColor: string;
+  born: number;
+  duration: number;
 }
 
 interface PingEffect {
@@ -64,6 +76,7 @@ export class FlatUnitLayer {
   private rangeOverlay: RangeOverlay | null = null;
   private ghost: GhostInfo | null = null;
   private missileTargets: { tile: TileRef; type: UnitType }[] = [];
+  private sinkingShips: SinkingShipEffect[] = [];
   private tempProj = { x: 0, y: 0, scale: 1 };
 
   constructor(
@@ -78,9 +91,33 @@ export class FlatUnitLayer {
       this.ping(samTile, "#7ec8ff", 24);
       this.spawnInterceptBurst(missileTile);
     };
+    const prevRemoved = game.onUnitRemoved;
+    game.onUnitRemoved = (u) => {
+      prevRemoved?.(u);
+      if ((u.type === UnitType.TransportShip || u.type === UnitType.Warship || u.type === UnitType.TradeShip) && !u.beached) {
+        this.triggerShipSinking(u);
+      }
+    };
 
     // Link into globe renderer
     this.globe.setUnitLayer(this);
+  }
+
+  triggerShipSinking(u: Unit): void {
+    const map = this.game.map;
+    const fx = u.fx > 0 ? u.fx : map.x(u.tile) + 0.5;
+    const fy = u.fy > 0 ? u.fy : map.y(u.tile) + 0.5;
+    if (!this.globe.projectXY(fx, fy, this.tempProj)) return;
+    this.sinkingShips.push({
+      tile: u.tile,
+      x: this.tempProj.x,
+      y: this.tempProj.y,
+      heading: u.heading,
+      type: u.type,
+      ownerColor: u.owner?.color ?? "#999999",
+      born: performance.now(),
+      duration: 2200,
+    });
   }
 
   ping(tile: TileRef, color: string, radius = 16): void {
@@ -319,7 +356,10 @@ export class FlatUnitLayer {
       const tile = u.tile >= 0 ? u.tile : u.targetTile;
       if (!map.isValid(tile)) continue;
 
-      if (!this.globe.projectTile(tile, this.tempProj)) continue;
+      // Use exact fractional coordinates for smooth sub-pixel gliding
+      const fx = u.fx > 0 ? u.fx : map.x(tile) + 0.5;
+      const fy = u.fy > 0 ? u.fy : map.y(tile) + 0.5;
+      if (!this.globe.projectXY(fx, fy, this.tempProj)) continue;
       const { x, y } = this.tempProj;
       const ownerColor = u.owner?.color ?? "#cccccc";
 
@@ -348,40 +388,23 @@ export class FlatUnitLayer {
           ctx.fillStyle = ownerColor;
           ctx.fillRect(bx, by, bw * pct, bh);
         }
-      } else if (u.type === UnitType.Warship || u.type === UnitType.TransportShip || u.type === UnitType.TradeShip) {
-        // Subtle floating wave bobbing in water
+      } else if (u.type === UnitType.TransportShip) {
         const bob = Math.sin(now * 0.003 + u.id * 1.5) * 1.5;
         const sy = y + bob;
-        const s = Math.max(14, Math.min(36, 10 * Math.sqrt(zoom)));
-
-        ctx.save();
-
-        // Water foam wake ripples
-        const wakePulse = (now * 0.002 + u.id * 0.3) % 1;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 * (1 - wakePulse)})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(x, sy + s * 0.2, s * (0.55 + 0.35 * wakePulse), 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Hull shadow
-        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-        ctx.beginPath();
-        ctx.arc(x, sy + 2, s * 0.55, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Hull body
-        ctx.fillStyle = ownerColor;
-        ctx.beginPath();
-        ctx.arc(x, sy, s * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = shade(ownerColor, -0.6);
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Ship icon glyph
-        paintOwnerGlyph(ctx, u.type, "#ffffff", Math.round(s * 0.7));
-        ctx.restore();
+        const s = Math.max(16, Math.min(40, 11 * Math.sqrt(zoom)));
+        this.drawTransportShip(ctx, x, sy, u.heading, s, ownerColor, u, now);
+      } else if (u.type === UnitType.Warship) {
+        const bob = Math.sin(now * 0.0025 + u.id * 1.5) * 1.2;
+        const sy = y + bob;
+        const s = Math.max(18, Math.min(46, 13 * Math.sqrt(zoom)));
+        this.drawWarship(ctx, x, sy, u.heading, s, ownerColor, u, now);
+      } else if (u.type === UnitType.TradeShip) {
+        const bob = Math.sin(now * 0.002 + u.id * 1.5) * 1.0;
+        const sy = y + bob;
+        const s = Math.max(16, Math.min(42, 12 * Math.sqrt(zoom)));
+        this.drawTradeShip(ctx, x, sy, u.heading, s, ownerColor, u, now);
+      } else if (u.type === UnitType.Shell) {
+        this.drawShell(ctx, x, y, u);
       } else if (NUKES.has(u.type) || u.type === UnitType.SAMMissile) {
         // Track smoke trail
         let trail = this.missileTrails.get(u.id);
@@ -418,8 +441,9 @@ export class FlatUnitLayer {
           ctx.strokeStyle = `rgba(255, 60, 40, ${0.4 + 0.4 * pulse})`;
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.arc(tx, ty, 10 + 4 * pulse, 0, Math.PI * 2);
+          ctx.arc(tx, ty, 8 + 4 * pulse, 0, Math.PI * 2);
           ctx.stroke();
+
           // Target line
           ctx.setLineDash([4, 4]);
           ctx.strokeStyle = "rgba(255, 100, 50, 0.25)";
@@ -469,6 +493,480 @@ export class FlatUnitLayer {
         ctx.fill();
         ctx.restore();
       }
+    }
+
+    // Render active sinking ship animations
+    this.renderSinkingShips(ctx, now);
+  }
+
+  private drawTransportShip(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    heading: number,
+    s: number,
+    ownerColor: string,
+    u: Unit,
+    now: number,
+  ): void {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Dynamic water wake lines trailing behind the stern
+    const wakePulse = (now * 0.003 + u.id * 0.7) % 1;
+    ctx.save();
+    ctx.rotate(heading);
+
+    // V-shaped bow wave
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.35, -s * 0.5);
+    ctx.lineTo(-s * 0.65, -s * 0.2);
+    ctx.moveTo(s * 0.35, -s * 0.5);
+    ctx.lineTo(s * 0.65, -s * 0.2);
+    ctx.stroke();
+
+    // Twin stern wake trails
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.45 * (1 - wakePulse)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, s * 0.5);
+    ctx.lineTo(-s * (0.6 + 0.5 * wakePulse), s * (1.2 + 0.8 * wakePulse));
+    ctx.moveTo(s * 0.3, s * 0.5);
+    ctx.lineTo(s * (0.6 + 0.5 * wakePulse), s * (1.2 + 0.8 * wakePulse));
+    ctx.stroke();
+
+    // Foamy bubbling wake
+    ctx.fillStyle = `rgba(220, 245, 255, ${0.35 * (1 - wakePulse)})`;
+    ctx.beginPath();
+    ctx.arc(0, s * (0.8 + 0.5 * wakePulse), s * (0.2 + 0.15 * wakePulse), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hull shadow on water
+    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.36 + 2, -s * 0.65 + 3, s * 0.72, s * 1.3, [s * 0.2, s * 0.2, s * 0.1, s * 0.1]);
+    ctx.fill();
+
+    // Outer hull plating: Landing craft profile
+    ctx.fillStyle = ownerColor;
+    ctx.strokeStyle = shade(ownerColor, -0.6);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.32, -s * 0.65); // bow ramp port
+    ctx.lineTo(s * 0.32, -s * 0.65);  // bow ramp starboard
+    ctx.lineTo(s * 0.38, -s * 0.1);   // starboard flare
+    ctx.lineTo(s * 0.34, s * 0.65);   // starboard stern
+    ctx.lineTo(-s * 0.34, s * 0.65);  // port stern
+    ctx.lineTo(-s * 0.38, -s * 0.1);  // port flare
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cargo troop hold (open well deck)
+    ctx.fillStyle = "#263238"; // dark non-skid naval steel
+    ctx.beginPath();
+    ctx.rect(-s * 0.22, -s * 0.45, s * 0.44, s * 0.8);
+    ctx.fill();
+
+    // Metal deck ribs
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.lineWidth = 1;
+    for (let dy = -s * 0.35; dy <= s * 0.25; dy += s * 0.15) {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.2, dy);
+      ctx.lineTo(s * 0.2, dy);
+      ctx.stroke();
+    }
+
+    // Aft wheelhouse / steering console
+    ctx.fillStyle = shade(ownerColor, -0.3);
+    ctx.fillRect(-s * 0.22, s * 0.4, s * 0.44, s * 0.22);
+    ctx.fillStyle = "#81d4fa"; // windshield glass
+    ctx.fillRect(-s * 0.18, s * 0.42, s * 0.36, s * 0.06);
+
+    // Starboard (Green) and Port (Red) navigation running lights
+    ctx.fillStyle = "#00e676";
+    ctx.beginPath();
+    ctx.arc(s * 0.32, -s * 0.5, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff1744";
+    ctx.beginPath();
+    ctx.arc(-s * 0.32, -s * 0.5, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore(); // restore local rotation
+
+    // Tactical Troop Badge (rendered upright above ship)
+    if (u.troops > 0) {
+      const troopText = fmtTroops(u.troops);
+      ctx.font = "bold 10px Inter, system-ui, sans-serif";
+      const tw = ctx.measureText(troopText).width + 12;
+      const th = 15;
+      const badgeY = -s * 0.95;
+
+      ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(-tw / 2, badgeY - th / 2, tw, th, 7);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(troopText, 0, badgeY);
+    }
+
+    // Retreating warning indicator
+    if (u.retreatOrdered) {
+      ctx.fillStyle = "#facc15";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("↩ RETREAT", 0, s * 0.95);
+    }
+
+    ctx.restore();
+  }
+
+  private drawWarship(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    heading: number,
+    s: number,
+    ownerColor: string,
+    u: Unit,
+    now: number,
+  ): void {
+    ctx.save();
+    ctx.translate(x, y);
+
+    const L = s * 1.45;
+    const W = s * 0.55;
+
+    ctx.save();
+    ctx.rotate(heading);
+
+    // Cutting Bow Wave
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.65);
+    ctx.lineTo(-W * 0.9, -L * 0.2);
+    ctx.moveTo(0, -L * 0.65);
+    ctx.lineTo(W * 0.9, -L * 0.2);
+    ctx.stroke();
+
+    // Twin-Screw Propeller Wake
+    const wakeT = (now * 0.0035 + u.id * 0.5) % 1;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 * (1 - wakeT)})`;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-W * 0.35, L * 0.55);
+    ctx.lineTo(-W * (0.8 + 0.8 * wakeT), L * (1.1 + 0.9 * wakeT));
+    ctx.moveTo(W * 0.35, L * 0.55);
+    ctx.lineTo(W * (0.8 + 0.8 * wakeT), L * (1.1 + 0.9 * wakeT));
+    ctx.stroke();
+
+    // Hull Shadow
+    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.beginPath();
+    ctx.moveTo(0 + 2, -L * 0.65 + 3);
+    ctx.lineTo(W * 0.5 + 2, -L * 0.2 + 3);
+    ctx.lineTo(W * 0.42 + 2, L * 0.55 + 3);
+    ctx.lineTo(-W * 0.42 + 2, L * 0.55 + 3);
+    ctx.lineTo(-W * 0.5 + 2, -L * 0.2 + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Armored Destroyer Hull (Battleship Gray with faction stripe)
+    ctx.fillStyle = "#37474f";
+    ctx.strokeStyle = "#212121";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.65); // sharp clipper bow
+    ctx.lineTo(W * 0.5, -L * 0.2);
+    ctx.lineTo(W * 0.42, L * 0.55);
+    ctx.lineTo(-W * 0.42, L * 0.55);
+    ctx.lineTo(-W * 0.5, -L * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Faction Camo Stripe along centerline
+    ctx.fillStyle = ownerColor;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.6);
+    ctx.lineTo(W * 0.18, -L * 0.15);
+    ctx.lineTo(W * 0.15, L * 0.5);
+    ctx.lineTo(-W * 0.15, L * 0.5);
+    ctx.lineTo(-W * 0.18, -L * 0.15);
+    ctx.closePath();
+    ctx.fill();
+
+    // Deck sections
+    ctx.fillStyle = "#455a64";
+    ctx.fillRect(-W * 0.3, -L * 0.15, W * 0.6, L * 0.65);
+
+    // Superstructure / Bridge Tower
+    ctx.fillStyle = "#cfd8dc";
+    ctx.strokeStyle = "#37474f";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(-W * 0.25, -L * 0.12, W * 0.5, L * 0.28, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // Bridge Windows (Blue glass)
+    ctx.fillStyle = "#0288d1";
+    ctx.fillRect(-W * 0.2, -L * 0.1, W * 0.4, L * 0.05);
+
+    // Rotating Radar Dish
+    const radarAng = now * 0.006;
+    ctx.strokeStyle = "#ffeb3b";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.02);
+    ctx.lineTo(Math.cos(radarAng) * W * 0.3, -L * 0.02 + Math.sin(radarAng) * W * 0.3);
+    ctx.stroke();
+
+    // Forward Dual Artillery Turret (Rotates towards target if engaging)
+    let forwardTurretAngle = 0;
+    if (u.targetUnit && u.targetUnit.active) {
+      const map = this.game.map;
+      const tX = u.targetUnit.fx > 0 ? u.targetUnit.fx : map.x(u.targetUnit.tile) + 0.5;
+      const tY = u.targetUnit.fy > 0 ? u.targetUnit.fy : map.y(u.targetUnit.tile) + 0.5;
+      const sX = u.fx > 0 ? u.fx : map.x(u.tile) + 0.5;
+      const sY = u.fy > 0 ? u.fy : map.y(u.tile) + 0.5;
+      const targetHeading = Math.atan2(tX - sX, -(tY - sY));
+      forwardTurretAngle = targetHeading - heading;
+    }
+
+    ctx.save();
+    ctx.translate(0, -L * 0.35);
+    ctx.rotate(forwardTurretAngle);
+    // Turret mount
+    ctx.fillStyle = "#eceff1";
+    ctx.strokeStyle = "#263238";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, W * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Dual Gun Barrels
+    ctx.fillStyle = "#263238";
+    ctx.fillRect(-W * 0.1, -L * 0.25, W * 0.06, L * 0.25);
+    ctx.fillRect(W * 0.04, -L * 0.25, W * 0.06, L * 0.25);
+    ctx.restore();
+
+    // Aft Secondary Turret
+    ctx.save();
+    ctx.translate(0, L * 0.32);
+    ctx.rotate(forwardTurretAngle * 0.5);
+    ctx.fillStyle = "#eceff1";
+    ctx.strokeStyle = "#263238";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, W * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#263238";
+    ctx.fillRect(-W * 0.08, L * 0.05, W * 0.05, L * 0.18);
+    ctx.fillRect(W * 0.03, L * 0.05, W * 0.05, L * 0.18);
+    ctx.restore();
+
+    ctx.restore(); // restore rotation
+
+    // Health Bar and Veterancy Stars
+    const maxHp = this.game.config.warshipHealthFor(u.veterancy);
+    const hpPct = Math.max(0, Math.min(1, u.health / maxHp));
+    const hbw = s * 1.1;
+    const hbh = 3.5;
+    const hby = -L * 0.65;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.fillRect(-hbw / 2 - 1, hby - 1, hbw + 2, hbh + 2);
+    ctx.fillStyle = hpPct > 0.5 ? "#4caf50" : (hpPct > 0.25 ? "#ff9800" : "#f44336");
+    ctx.fillRect(-hbw / 2, hby, hbw * hpPct, hbh);
+
+    // Veterancy Stars
+    if (u.veterancy > 0) {
+      const stars = "★".repeat(u.veterancy);
+      ctx.font = "bold 10px sans-serif";
+      ctx.fillStyle = "#ffd700";
+      ctx.textAlign = "center";
+      ctx.fillText(stars, 0, hby - 4);
+    }
+
+    ctx.restore();
+  }
+
+  private drawTradeShip(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    heading: number,
+    s: number,
+    ownerColor: string,
+    u: Unit,
+    now: number,
+  ): void {
+    ctx.save();
+    ctx.translate(x, y);
+
+    const L = s * 1.3;
+    const W = s * 0.5;
+
+    ctx.save();
+    ctx.rotate(heading);
+
+    // Stern cargo wake
+    const wakeT = (now * 0.0025 + u.id * 0.4) % 1;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * (1 - wakeT)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-W * 0.35, L * 0.5);
+    ctx.lineTo(-W * (0.7 + 0.6 * wakeT), L * (1.1 + 0.7 * wakeT));
+    ctx.moveTo(W * 0.35, L * 0.5);
+    ctx.lineTo(W * (0.7 + 0.6 * wakeT), L * (1.1 + 0.7 * wakeT));
+    ctx.stroke();
+
+    // Shadow
+    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+    ctx.beginPath();
+    ctx.roundRect(-W * 0.45 + 2, -L * 0.55 + 3, W * 0.9, L * 1.1, 4);
+    ctx.fill();
+
+    // Commercial Cargo Hull (Red / Maroon anti-fouling keel + Dark hull)
+    ctx.fillStyle = "#1e293b";
+    ctx.strokeStyle = shade(ownerColor, -0.4);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.6); // bulbous bow
+    ctx.lineTo(W * 0.45, -L * 0.35);
+    ctx.lineTo(W * 0.45, L * 0.45);
+    ctx.lineTo(-W * 0.45, L * 0.45);
+    ctx.lineTo(-W * 0.45, -L * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Raised Forecastle
+    ctx.fillStyle = ownerColor;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.6);
+    ctx.lineTo(W * 0.4, -L * 0.35);
+    ctx.lineTo(-W * 0.4, -L * 0.35);
+    ctx.closePath();
+    ctx.fill();
+
+    // Multi-colored Cargo Containers in Hold
+    const containerColors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
+    const cw = W * 0.32;
+    const ch = L * 0.16;
+    for (let r = 0; r < 3; r++) {
+      const cy = -L * 0.28 + r * (ch + 2);
+      // Left container
+      const c1 = containerColors[(u.id + r * 2) % containerColors.length];
+      ctx.fillStyle = c1;
+      ctx.fillRect(-W * 0.38, cy, cw, ch);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(-W * 0.38, cy, cw, ch);
+
+      // Right container
+      const c2 = containerColors[(u.id + r * 2 + 1) % containerColors.length];
+      ctx.fillStyle = c2;
+      ctx.fillRect(W * 0.06, cy, cw, ch);
+      ctx.strokeRect(W * 0.06, cy, cw, ch);
+    }
+
+    // Aft Bridge & Smokestack
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(-W * 0.35, L * 0.26, W * 0.7, L * 0.18);
+    // Bridge windows
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(-W * 0.28, L * 0.28, W * 0.56, L * 0.04);
+    // Smokestack with exhaust
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(-W * 0.1, L * 0.38, W * 0.2, L * 0.08);
+
+    ctx.restore(); // restore rotation
+
+    // Cargo Gold Icon Badge
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("💰", 0, -L * 0.7);
+
+    ctx.restore();
+  }
+
+  private drawShell(ctx: CanvasRenderingContext2D, x: number, y: number, u: Unit): void {
+    ctx.save();
+    ctx.fillStyle = "#fff59d";
+    ctx.shadowColor = "#ff5722";
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 138, 101, 0.75)";
+    ctx.lineWidth = 2;
+    const hx = Math.sin(u.heading) * 10;
+    const hy = -Math.cos(u.heading) * 10;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - hx, y - hy);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private renderSinkingShips(ctx: CanvasRenderingContext2D, now: number): void {
+    if (!this.sinkingShips.length) return;
+    for (let i = this.sinkingShips.length - 1; i >= 0; i--) {
+      const ship = this.sinkingShips[i];
+      const t = (now - ship.born) / ship.duration;
+      if (t >= 1) {
+        this.sinkingShips.splice(i, 1);
+        continue;
+      }
+      const alpha = 1 - Math.pow(t, 1.5);
+      const listAngle = ship.heading + (t * 0.5); // ship lists to side as it sinks
+      const sinkDepth = t * 18;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(ship.x, ship.y + sinkDepth);
+      ctx.rotate(listAngle);
+
+      // Expanding water bubble rings
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * (1 - t)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16 + t * 24, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Burning oil smoke
+      ctx.fillStyle = `rgba(30, 41, 59, ${0.7 * (1 - t)})`;
+      for (let p = 0; p < 4; p++) {
+        const px = Math.sin(now * 0.01 + p) * 10;
+        const py = -t * 28 - p * 6;
+        ctx.beginPath();
+        ctx.arc(px, py, 4 + t * 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Hull silhouette going under
+      ctx.fillStyle = "#1e293b";
+      ctx.beginPath();
+      ctx.roundRect(-8, -14, 16, 28, 4);
+      ctx.fill();
+
+      ctx.restore();
     }
   }
 

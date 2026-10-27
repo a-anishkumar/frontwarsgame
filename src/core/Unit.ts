@@ -55,6 +55,8 @@ export class Unit {
   deleteAt = -1;
   /** transport: player ordered a retreat */
   retreatOrdered = false;
+  /** transport: successfully reached shore and disembarked without being sunk */
+  beached = false;
 
   constructor(
     readonly type: UnitType,
