@@ -219,6 +219,16 @@ export const COUNTRY_ISO: Record<string, string> = {
   "laos": "LA",
   "nepal": "NP",
   "sri lanka": "LK",
+  "antarctica": "AQ",
+  "antarctic": "AQ",
+  "antarctic peninsula": "AQ",
+  "queen maud land": "AQ",
+  "wilkes land": "AQ",
+  "victoria land": "AQ",
+  "marie byrd land": "AQ",
+  "enderby land": "AQ",
+  "weddell coast": "AQ",
+  "ross dependency": "AQ",
 };
 
 export function countryFlag(name: string): string {
@@ -240,7 +250,7 @@ export function getDoctrineForNation(name: string, fallbackIdx: number): BotPers
   if (norm.includes("russia") || norm.includes("germany") || norm.includes("turkey") || norm.includes("mongolia") || norm.includes("serbia")) {
     return "Aggressive";
   }
-  if (norm.includes("united states") || norm.includes("united kingdom") || norm.includes("portugal") || norm.includes("spain") || norm.includes("netherlands") || norm.includes("australia") || norm.includes("japan")) {
+  if (norm.includes("united states") || norm.includes("united kingdom") || norm.includes("portugal") || norm.includes("spain") || norm.includes("netherlands") || norm.includes("australia") || norm.includes("japan") || norm.includes("antarctic") || norm.includes("maud") || norm.includes("wilkes") || norm.includes("ross") || norm.includes("byrd")) {
     return "Expansionist";
   }
   if (norm.includes("finland") || norm.includes("ukraine") || norm.includes("poland") || norm.includes("israel") || norm.includes("taiwan") || norm.includes("norway")) {

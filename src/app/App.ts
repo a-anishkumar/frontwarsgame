@@ -1160,7 +1160,7 @@ export class App {
     const country = map.countryAt(tile);
     let text: string;
     if (!map.isLand(tile)) {
-      text = map.isImpassable(tile) ? "Antarctica · impassable ice" : "Ocean";
+      text = map.isImpassable(tile) ? "Polar Ice Shelf" : "Ocean";
       this.globe.setHover(-1, -1);
     } else if (owner) {
       const human = game.human!;

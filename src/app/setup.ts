@@ -29,11 +29,23 @@ export function createGame(map: GameMap, settings: GameSettings): Game {
 
   // If real-world countries are available on this map:
   const validCountries = map.countries
-    ? map.countries.filter((c) => c && c.id > 0 && c.tiles > 12 && c.centroid >= 0 && c.name && c.name !== "Antarctica")
+    ? map.countries.filter((c) => c && c.id > 0 && c.tiles > 12 && c.centroid >= 0 && c.name)
     : [];
 
   if (validCountries.length > 0) {
-    const shuffled = rnd.shuffle([...validCountries]);
+    const isAntarctic = (c: { name: string }) =>
+      c.name.includes("Antarctic") || c.name.includes("Maud") || c.name.includes("Wilkes") ||
+      c.name.includes("Victoria") || c.name.includes("Byrd") || c.name.includes("Enderby") ||
+      c.name.includes("Weddell") || c.name.includes("Ross");
+
+    const antarctic = validCountries.filter(isAntarctic);
+    const nonAntarctic = validCountries.filter((c) => !isAntarctic(c));
+
+    // Guarantee bots spawn in Antarctica so polar battles are always active
+    const antarcticSlots = Math.min(antarctic.length, Math.max(1, Math.min(3, Math.floor(numBots / 7))));
+    const chosenAntarctic = rnd.shuffle([...antarctic]).slice(0, antarcticSlots);
+    const chosenRest = rnd.shuffle([...nonAntarctic]).slice(0, Math.max(0, numBots - chosenAntarctic.length));
+    const shuffled = rnd.shuffle([...chosenAntarctic, ...chosenRest]);
     const usedNames = new Set([human.name]);
 
     for (let i = 0; i < numBots; i++) {

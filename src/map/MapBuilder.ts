@@ -122,6 +122,56 @@ export async function buildMap(opts: Partial<MapBuildOptions> = {}): Promise<Gam
   progress("Splitting states and provinces worldwide…");
   await splitRegions(country, countries, regions, W, H, yieldFrame);
 
+  // Subdivide Antarctica into 8 authentic playable geographic sectors for bot nations
+  if (antarcticaId > 0) {
+    const sectors = [
+      { name: "Antarctic Peninsula", lat: -68, lon: -65 },
+      { name: "Weddell Coast", lat: -75, lon: -38 },
+      { name: "Queen Maud Land", lat: -75, lon: 15 },
+      { name: "Enderby Land", lat: -70, lon: 65 },
+      { name: "Wilkes Land", lat: -72, lon: 115 },
+      { name: "Victoria Land", lat: -74, lon: 155 },
+      { name: "Ross Dependency", lat: -80, lon: 180 },
+      { name: "Marie Byrd Land", lat: -78, lon: -110 },
+    ];
+
+    countries[antarcticaId].name = sectors[0].name;
+    countries[antarcticaId].lat = sectors[0].lat;
+    countries[antarcticaId].lon = sectors[0].lon;
+
+    const sectorIds = [antarcticaId];
+    for (let s = 1; s < sectors.length; s++) {
+      const id = countries.length;
+      countries.push({
+        id,
+        name: sectors[s].name,
+        centroid: -1,
+        tiles: 0,
+        lat: sectors[s].lat,
+        lon: sectors[s].lon,
+        parentId: id,
+      });
+      sectorIds.push(id);
+    }
+
+    for (let i = 0; i < country.length; i++) {
+      if (country[i] === antarcticaId) {
+        const x = i % W;
+        const lon = (x / W) * 360 - 180;
+        let sIdx = 0;
+        if (lon >= -80 && lon < -55) sIdx = 0;
+        else if (lon >= -55 && lon < -20) sIdx = 1;
+        else if (lon >= -20 && lon < 45) sIdx = 2;
+        else if (lon >= 45 && lon < 90) sIdx = 3;
+        else if (lon >= 90 && lon < 135) sIdx = 4;
+        else if (lon >= 135 && lon < 170) sIdx = 5;
+        else if (lon >= 170 || lon < -140) sIdx = 6;
+        else sIdx = 7;
+        country[i] = sectorIds[sIdx];
+      }
+    }
+  }
+
   progress("Building terrain…");
   const terrain = new Uint8Array(W * H);
   const landSeed = new Int32Array(countries.length).fill(-1);
@@ -133,10 +183,6 @@ export async function buildMap(opts: Partial<MapBuildOptions> = {}): Promise<Gam
     const cid = country[i];
     if (cid === 0) {
       terrain[i] = TerrainType.Water;
-      continue;
-    }
-    if (cid === antarcticaId) {
-      terrain[i] = TerrainType.Impassable;
       continue;
     }
     if (water[i] > 140) {
