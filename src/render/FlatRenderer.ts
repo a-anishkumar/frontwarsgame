@@ -778,12 +778,14 @@ export class FlatRenderer {
     this.clampPan();
   }
 
-  private resetView(): void {
+  resetView(): void {
     const w = this.canvas.width || window.innerWidth;
     const h = this.canvas.height || window.innerHeight;
     this._zoom = Math.min(w / this.map.width, h / this.map.height);
     this.panX = (w - this.map.width * this._zoom) / 2;
     this.panY = (h - this.map.height * this._zoom) / 2;
+    this.clampPan();
+    this.rebuildFullImage();
   }
 
   private clampPan(): void {
@@ -865,4 +867,21 @@ export class FlatRenderer {
     }, { passive: false });
     cv.addEventListener("touchend", () => { lastDist = 0; });
   }
+
+  panBy(dx: number, dy: number): void {
+    this.panX += dx;
+    this.panY += dy;
+    this.clampPan();
+  }
+
+  zoomBy(factor: number): void {
+    const cx = this.canvas.width / 2;
+    const cy = this.canvas.height / 2;
+    const newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this._zoom * factor));
+    this.panX = cx - (cx - this.panX) * (newZoom / this._zoom);
+    this.panY = cy - (cy - this.panY) * (newZoom / this._zoom);
+    this._zoom = newZoom;
+    this.clampPan();
+  }
 }
+

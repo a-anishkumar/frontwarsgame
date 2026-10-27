@@ -813,4 +813,25 @@ export class GlobeRenderer {
 
     this.renderer.render(this.scene, this.camera);
   }
+
+  panBy(dx: number, dy: number): void {
+    // Globe orbit controls can rotate on WASD
+    const angleX = (dx / 300) * 0.1;
+    const angleY = (dy / 300) * 0.1;
+    this.camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), -angleX);
+    this.camera.lookAt(0, 0, 0);
+  }
+
+  zoomBy(factor: number): void {
+    const d = this.cameraDistance();
+    const target = Math.max(this.controls.minDistance + 10, Math.min(this.controls.maxDistance, d / factor));
+    this.zoomTo(target);
+  }
+
+  resetView(): void {
+    this.camDir.set(0, 0.2, 1).normalize().multiplyScalar(GLOBE_RADIUS + 80);
+    this.camera.position.copy(this.camDir);
+    this.camera.lookAt(0, 0, 0);
+  }
 }
+

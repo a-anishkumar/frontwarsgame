@@ -31,6 +31,14 @@ export class GoldFloats {
     this.pops.push({ el, tile, born: performance.now(), life: troops > 0 ? 2200 : 1400 });
   }
 
+  spawnEmote(tile: TileRef, emoji: string, label: string): void {
+    const el = document.createElement("div");
+    el.className = "gold-pop emote-pop";
+    el.innerHTML = `<span style="font-size:26px;display:block;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.6));">${emoji}</span><span style="font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 4px #000;letter-spacing:0.5px">${label}</span>`;
+    this.container.appendChild(el);
+    this.pops.push({ el, tile, born: performance.now(), life: 2500 });
+  }
+
   update(now: number): void {
     if (!this.pops.length) return;
     for (let i = this.pops.length - 1; i >= 0; i--) {

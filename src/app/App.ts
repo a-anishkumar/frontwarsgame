@@ -75,6 +75,8 @@ export class App {
   private running = false;
   private uiHidden = false;
   private selectedWarship: Unit | null = null;
+  private backslashDown = false;
+  private terrainViewActive = false;
 
   constructor(
     private map: GameMap,
@@ -574,6 +576,51 @@ export class App {
     return { center, slices: [info, boat, ally, fourth] };
   }
 
+  private nearestUpgradableUnit(tile: number): Unit | null {
+    const human = this.game.human;
+    if (!human) return null;
+    let best: Unit | null = null;
+    let bestDist = Infinity;
+    const cfg = this.game.config;
+    for (const u of human.units) {
+      if (!u.isStructure() || !u.active || u.constructing || u.level >= cfg.maxLevel(u.type)) continue;
+      const d = this.map.distSq(u.tile, tile);
+      if (d < bestDist) {
+        bestDist = d;
+        best = u;
+      }
+    }
+    return best;
+  }
+
+  private emoteRadial(tile: number): RadialModel {
+    const human = this.game.human!;
+    const send = (emoji: string, text: string) => {
+      this.unitLayer.ping(tile, human.color, 16);
+      this.goldFloats.spawnEmote(tile, emoji, text);
+      this.hud.toast(`${emoji} ${text}`, MessageType.Success);
+    };
+    return {
+      center: {
+        id: "center",
+        label: "Emotes",
+        color: human.color,
+        icon: "info",
+        run: () => {},
+      },
+      slices: [
+        { id: "e1", label: "⚔️ Attack", color: "#e74c3c", icon: "warship", run: () => send("⚔️", "Attack!") },
+        { id: "e2", label: "🛡️ Defend", color: "#3498db", icon: "defense", run: () => send("🛡️", "Defend!") },
+        { id: "e3", label: "🤝 Peace", color: "#2ecc71", icon: "info", run: () => send("🤝", "Peace / Ally") },
+        { id: "e4", label: "💀 RIP", color: "#95a5a6", icon: "atom", run: () => send("💀", "RIP") },
+        { id: "e5", label: "🔥 Rush", color: "#e67e22", icon: "hydrogen", run: () => send("🔥", "Rush!") },
+        { id: "e6", label: "🚀 Nuke", color: "#9b59b6", icon: "mirv", run: () => send("🚀", "Nuke incoming!") },
+        { id: "e7", label: "👑 GG", color: "#f1c40f", icon: "city", run: () => send("👑", "Good Game!") },
+        { id: "e8", label: "🏳️ Surrender", color: "#ffffff", icon: "port", run: () => send("🏳️", "Surrender") },
+      ],
+    };
+  }
+
   // ---------------- input ----------------
   private bindInput(): void {
     const canvas = this.globe.canvas;
@@ -615,40 +662,121 @@ export class App {
     window.addEventListener("blur", () => this.globe.setTerrainView(false));
     window.addEventListener("keydown", (e) => {
       if ((e.target as HTMLElement)?.closest("input, textarea, select, [contenteditable]")) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.repeat && !["1", "2"].includes(e.key)) return;
-      const human = this.game.human!;
       if (this.devPanel?.handleKey(e)) return;
+
       if (e.key === "\\" || e.code === "Backslash") {
+        this.backslashDown = true;
         this.setUiHidden(!this.uiHidden);
         return;
       }
+      if (this.backslashDown && (e.key === "r" || e.key === "R")) {
+        this.globe.resetView();
+        this.hud.toast("Graphics reset", MessageType.Success);
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.shiftKey && (e.key === "R" || e.key === "r")) {
         this.retaliate();
         return;
       }
+
+      // 1-6 keys: build City, Factory, Port, Defense Post, Silo, SAM on tile under cursor
+      if (["1", "2", "3", "4", "5", "6"].includes(e.key)) {
+        const typeMap: Record<string, UnitType> = {
+          "1": UnitType.City,
+          "2": UnitType.Factory,
+          "3": UnitType.Port,
+          "4": UnitType.DefensePost,
+          "5": UnitType.MissileSilo,
+          "6": UnitType.SAMLauncher,
+        };
+        const type = typeMap[e.key];
+        if (type) {
+          const human = this.game.human!;
+          if (this.hoverTile >= 0) {
+            const tile = this.hoverTile;
+            const r = this.action({ kind: "build", type, tile }, () => build(this.game, human, type, tile, false));
+            notify(this.game, human, r);
+            if (r.ok) {
+              this.unitLayer.ping(tile, NUKES.has(type) ? "#ff3b30" : human.color, 10);
+              this.hud.toast(`Built ${unitLabel(type)}`);
+            } else {
+              this.hud.toast(r.message || "Cannot build here", MessageType.Warn);
+            }
+          } else {
+            this.buildBar.toggle(type);
+          }
+          return;
+        }
+      }
+
+      const keyLower = e.key.toLowerCase();
+      // WASD camera movement
+      if (keyLower === "w" || e.code === "ArrowUp") {
+        e.preventDefault();
+        this.globe.panBy(0, 60);
+        return;
+      }
+      if (keyLower === "s" || e.code === "ArrowDown") {
+        e.preventDefault();
+        this.globe.panBy(0, -60);
+        return;
+      }
+      if (keyLower === "a" || e.code === "ArrowLeft") {
+        e.preventDefault();
+        this.globe.panBy(60, 0);
+        return;
+      }
+      if (keyLower === "d" || e.code === "ArrowRight") {
+        e.preventDefault();
+        this.globe.panBy(-60, 0);
+        return;
+      }
+
+      // Q / E camera zoom
+      if (keyLower === "q") {
+        e.preventDefault();
+        this.globe.zoomBy(1.2);
+        return;
+      }
+      if (keyLower === "e") {
+        e.preventDefault();
+        this.globe.zoomBy(1 / 1.2);
+        return;
+      }
+
+      // C: Centers camera on your territory
+      if (keyLower === "c") {
+        e.preventDefault();
+        const human = this.game.human!;
+        const t = this.anyTileOf(human);
+        if (t >= 0) {
+          this.globe.flyTo(t);
+          this.hud.toast("Centered on territory");
+        }
+        return;
+      }
+
+      // Space: Switch between terrain and country view
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        this.terrainViewActive = !this.terrainViewActive;
+        this.globe.setTerrainView(this.terrainViewActive);
+        this.hud.toast(this.terrainViewActive ? "Terrain relief view" : "Geopolitical country view");
+        return;
+      }
+
       const buildKey = BuildBar.keyToType(e.key);
-      if (buildKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (buildKey) {
         this.buildBar.toggle(buildKey);
         return;
       }
+
       switch (e.key) {
         case "F3":
           e.preventDefault();
           this.performanceVisible = !this.performanceVisible;
           this.performanceLabel.hidden = !this.performanceVisible;
-          break;
-        case "1":
-          this.setRatio("attackRatio",Math.max(0.01, human.attackRatio - 0.1));
-          this.hud.syncSliders();
-          break;
-        case "2":
-          this.setRatio("attackRatio",Math.min(1, human.attackRatio + 0.1));
-          this.hud.syncSliders();
-          break;
-        case " ":
-          e.preventDefault();
-          this.globe.setTerrainView(true);
           break;
         case "Escape":
           this.radial.close();
@@ -662,24 +790,27 @@ export class App {
           break;
         case "h":
         case "H": {
+          const human = this.game.human!;
           const t = this.anyTileOf(human);
           if (t >= 0) this.globe.flyTo(t);
           break;
         }
         case "]":
-          if(this.online)break;
+          if (this.online) break;
           this.speed = Math.min(this.game.isDev() ? 16 : 8, this.speed * 2);
           this.hud.toast(`Speed ×${this.speed}`);
           break;
         case "[":
-          if(this.online)break;
+          if (this.online) break;
           this.speed = Math.max(0.5, this.speed / 2);
           this.hud.toast(`Speed ×${this.speed}`);
           break;
       }
     });
     window.addEventListener("keyup", (e) => {
-      if (e.key === " ") this.globe.setTerrainView(false);
+      if (e.key === "\\" || e.code === "Backslash") {
+        this.backslashDown = false;
+      }
     });
   }
 
@@ -691,6 +822,24 @@ export class App {
     if (!pick) return;
     const tile = pick.tile;
     const map = this.map;
+
+    if (button === 1) {
+      // Middle mouse button auto-upgrades the nearest building
+      const candidate = this.nearestUpgradableUnit(tile);
+      if (candidate) {
+        const r = this.action({ kind: "upgrade", id: candidate.id }, () => upgradeUnit(game, human, candidate));
+        notify(game, human, r);
+        if (r.ok) {
+          this.unitLayer.ping(candidate.tile, human.color, 12);
+          this.hud.toast(`Upgraded ${unitLabel(candidate.type)} to Lvl ${candidate.level}`);
+        } else {
+          this.hud.toast(r.message || "Cannot upgrade", MessageType.Warn);
+        }
+      } else {
+        this.hud.toast("No upgradable buildings nearby", MessageType.Warn);
+      }
+      return;
+    }
 
     if (button === 2) {
       if (this.armed) return this.cancelBuild();
@@ -706,6 +855,24 @@ export class App {
       return;
     }
     if (button !== 0) return;
+
+    // \ key + left click opens emote menu
+    if (this.backslashDown) {
+      this.radial.open(x, y, this.emoteRadial(tile));
+      return;
+    }
+
+    // Ctrl + left click (or Cmd on Mac) opens build menu
+    if (e.ctrlKey || e.metaKey) {
+      this.radial.open(x, y, this.actionRadial(tile));
+      return;
+    }
+
+    // Shift + left click attacks
+    if (e.shiftKey && !game.isDev()) {
+      this.doAttack(tile);
+      return;
+    }
 
     if (game.isDev() && e.shiftKey && map.isLand(tile)) {
       if (!human.hasSpawned) {

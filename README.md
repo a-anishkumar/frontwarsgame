@@ -89,31 +89,42 @@ npm run server
 
 ## Controls & Hotkeys Reference
 
-| Action | Key / Input | In-Game Behavior |
+### Mouse Controls
+| Action | Input | Behavior |
 | :--- | :--- | :--- |
-| **Pan Camera** | `Right-click + Drag` or `Middle-click + Drag` | Pan across the 2D world map with seamless horizontal wrapping. |
-| **Tactical Zoom** | `Mouse Wheel` or `Pinch Gesture` | Zoom from strategic global satellite view down to street-level structure detail. |
-| **Select Spawn Tile** | `Left-click` on unowned land | Designate or re-pick your homeland starting tile during the match countdown. |
-| **Attack / Expand** | `Left-click` on neighbor / enemy | Direct military forces to push across the border into target territory. |
-| **Amphibious Transport** | `Left-click` on distant coast | Launch a naval transport ship fleet to establish an overseas beachhead. |
-| **Radial Build Menu** | `Right-click` on owned territory | Open the construction wheel over that tile to build or upgrade structures. |
-| **Quick Build: City** | Key `Q` | Place a City to expand population capacity and troop growth. |
-| **Quick Build: Factory** | Key `F` | Place an industrial Factory to spawn trade trains across connected rail. |
-| **Quick Build: Defense** | Key `W` | Place a fortified Defense Post along threatened border tiles. |
-| **Quick Build: Port** | Key `E` | Place a coastal Port to commission trade and war fleets. |
-| **Quick Build: Silo** | Key `R` | Place a hardened underground Ballistic Missile Silo. |
-| **Quick Build: SAM** | Key `T` | Place a Surface-to-Air Missile interceptor battery. |
-| **Quick Build: Radar** | Key `A` | Place a Radar Early Warning Reconnaissance station. |
-| **Locate Nation** | `Click` on Leaderboard row / `Locate` btn | Smoothly fly and center camera over that sovereign nation's homeland. |
-| **Inspect / Diplomacy** | `Click` on enemy territory or name | Open the Diplomatic Panel to view bot personality, troops, gold, and treaties. |
-| **Attack Ratio Adjust** | Keys `1` / `2`, Slider, or `Shift + Wheel` | Set the percentage of available army deployed per assault (10% to 100%). |
-| **Economy Worker Split** | Bottom-Left Commander Slider | Shift your national balance between gold-earning workers and military troops. |
-| **Center on Homeland** | Key `H` | Instantly fly camera back to your capital / home territory. |
-| **Topography Overlay** | Hold `Space` | Toggle pure elevation hillshading satellite relief mode. |
-| **Pause / Resume** | Key `P` | Pause single-player match simulation tick loop. |
-| **Game Speed Modifier** | Keys `[` and `]` | Adjust simulation tick rate from normal speed (`×1`) up to hyper-speed (`×10`). |
-| **Performance Overlay** | Key `F3` | Toggle real-time FPS counter, tick latency (ms/tick), and rendering stats. |
-| **Cancel / Close** | Key `Esc` | Close active panels, dismiss radial menus, or cancel targeting cursors. |
+| **Radial (Pie) Menu** | `Right-click` | Opens the main control hub on the clicked tile for building, attacking, sending boats, alliances, or betrayal. |
+| **Auto-Upgrade Building** | `Middle-click` | Instantly upgrades the nearest owned structure to its next level without opening panels. |
+| **Adjust Attack Ratio** | `Shift + Mouse Wheel` | Smoothly increases or decreases attack army commitment percentage with high precision. |
+| **Pan Camera** | `Right-drag` or `Middle-drag` | Smoothly pan across the 2D world map with seamless horizontal antimeridian wrapping. |
+| **Tactical Zoom** | `Mouse Wheel` or `Pinch` | Zoom from strategic satellite overview to high-detail building inspection. |
+| **Direct Attack** | `Left-click` on foreign land | Order an offensive along the shared frontier against neutral or enemy territory. |
+
+### Mouse + Key Combos
+| Combo | Input | Behavior |
+| :--- | :--- | :--- |
+| **Forced Attack** | `Shift + Left-click` | Direct military attack, guaranteeing troop advance even when over interactive elements. |
+| **Open Build Menu** | `Ctrl + Left-click` (or `Cmd`) | Opens the construction radial menu right under your mouse cursor. |
+| **Open Emote Menu** | `\ + Left-click` | Opens the tactical Emote Wheel (⚔️ Attack, 🛡️ Defend, 🤝 Peace, 💀 RIP, 🔥 Rush, 🚀 Nuke, 👑 GG, 🏳️ Surrender). |
+| **Reset Graphics & View** | `\ + R` | Instantly resets camera zoom, centers global framing, clears tile buffers, and restores default rendering. |
+
+### Keyboard Hotkeys
+| Action | Key | Behavior |
+| :--- | :--- | :--- |
+| **Move Camera** | `W`, `A`, `S`, `D` or `Arrow Keys` | Pan the map smoothly in four directions. |
+| **Zoom In / Out** | `Q` / `E` | Zoom in (`Q`) or zoom out (`E`) dynamically centered on screen. |
+| **Center on Territory** | `C` or `H` | Instantly fly the camera and center view over your homeland. |
+| **Toggle Country / Terrain View** | `Space` | Toggle between geopolitical country border shading and topographic elevation hillshading. |
+| **Build City (Cursor Tile)** | `1` | Build a City directly on the tile under your cursor (or arm placement mode). |
+| **Build Factory (Cursor Tile)** | `2` | Build an industrial Factory directly on the tile under your cursor. |
+| **Build Port (Cursor Tile)** | `3` | Build a coastal Port directly on the tile under your cursor. |
+| **Build Defense Post (Cursor Tile)** | `4` | Build a fortified Defense Post directly on the tile under your cursor. |
+| **Build Missile Silo (Cursor Tile)** | `5` | Build a Ballistic Missile Silo directly on the tile under your cursor. |
+| **Build SAM Launcher (Cursor Tile)** | `6` | Build a Surface-to-Air Missile interceptor battery directly on the tile under your cursor. |
+| **Build Radar / Warship / Nuke** | `7`, `8`, `9`, `0`, `M` | Quick-build Radar (`7`), Warship (`8`), Atom Bomb (`9`), Hydrogen Bomb (`0`), MIRV (`M`). |
+| **Pause / Resume** | `P` | Pause and unpause single-player match simulation tick loop. |
+| **Simulation Speed** | `[` and `]` | Halve (`[`) or double (`]`) match simulation tick rate. |
+| **Performance Overlay** | `F3` | Toggle FPS counter, tick latency, and rendering diagnostics. |
+| **Dismiss / Cancel** | `Escape` | Dismiss radial menus, cancel build targeting, and close inspection dialogs. |
 
 ---
 

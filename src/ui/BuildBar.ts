@@ -60,6 +60,17 @@ const ITEMS: UnitType[] = [
 ];
 
 const KEYS: Record<string, UnitType> = {
+  "1": UnitType.City,
+  "2": UnitType.Factory,
+  "3": UnitType.Port,
+  "4": UnitType.DefensePost,
+  "5": UnitType.MissileSilo,
+  "6": UnitType.SAMLauncher,
+  "7": UnitType.Radar,
+  "8": UnitType.Warship,
+  "9": UnitType.AtomBomb,
+  "0": UnitType.HydrogenBomb,
+  m: UnitType.MIRV,
   q: UnitType.City,
   f: UnitType.Factory,
   w: UnitType.DefensePost,
@@ -72,7 +83,19 @@ const KEYS: Record<string, UnitType> = {
   i: UnitType.HydrogenBomb,
   o: UnitType.MIRV,
 };
-const KEY_OF = new Map<UnitType, string>(Object.entries(KEYS).map(([k, v]) => [v, k.toUpperCase()]));
+const KEY_OF = new Map<UnitType, string>([
+  [UnitType.City, "1"],
+  [UnitType.Factory, "2"],
+  [UnitType.Port, "3"],
+  [UnitType.DefensePost, "4"],
+  [UnitType.MissileSilo, "5"],
+  [UnitType.SAMLauncher, "6"],
+  [UnitType.Radar, "7"],
+  [UnitType.Warship, "8"],
+  [UnitType.AtomBomb, "9"],
+  [UnitType.HydrogenBomb, "0"],
+  [UnitType.MIRV, "M"],
+]);
 
 interface Item {
   type: UnitType;
