@@ -121,6 +121,13 @@ npm run server
 | **Build Missile Silo (Cursor Tile)** | `5` | Build a Ballistic Missile Silo directly on the tile under your cursor. |
 | **Build SAM Launcher (Cursor Tile)** | `6` | Build a Surface-to-Air Missile interceptor battery directly on the tile under your cursor. |
 | **Build Radar / Warship / Nuke** | `7`, `8`, `9`, `0`, `M` | Quick-build Radar (`7`), Warship (`8`), Atom Bomb (`9`), Hydrogen Bomb (`0`), MIRV (`M`). |
+| **Build Coastal Battery** | `B` | Construct heavy shore artillery on coastal land to bombard hostile naval fleets. |
+| **Build Barracks** | `J` | Build a Military Barracks to train elite combat reserves (+150 troops/level every 3s). |
+| **Build Central Bank** | `K` | Construct a Central Bank to compound 2%–4% treasury interest and earn build discounts. |
+| **Build Airbase** | `L` | Build a Military Airbase to scramble tactical strike fighters on precision bombing runs. |
+| **Tactical Map Ping** | `G` | Drop a tactical sonar ping beacon at cursor; allied bots direct attack forces to the ping. |
+| **Quick Fortify Border** | `F` | Auto-detects frontline border tiles nearest to enemies and queues defense posts. |
+| **Mute / Unmute Sound FX** | `M` (or HUD toggle) | Toggles procedural Web Audio sound synthesizer effects. |
 | **Pause / Resume** | `P` | Pause and unpause single-player match simulation tick loop. |
 | **Simulation Speed** | `[` and `]` | Halve (`[`) or double (`]`) match simulation tick rate. |
 | **Performance Overlay** | `F3` | Toggle FPS counter, tick latency, and rendering diagnostics. |
@@ -243,6 +250,26 @@ Clicking any foreign nation opens the **Diplomatic Dossier**:
 ### SAM Battery & Radar Stations
 - **SAM Launcher (60,000 Gold)**: Surface-to-Air Missile battery. Projects an automated defensive radar dome that tracks and intercepts incoming ballistic rockets and nuclear warheads mid-flight.
 - **Radar Station (30,000 Gold)**: Expands tactical fog-of-war vision, providing early detection of distant naval flotillas and incoming missile launches.
+
+### Coastal Artillery Battery
+- **Cost**: 150,000 Gold *(Must be placed on coastal land adjacent to water)*
+- **Function**: Automatically scans coastal waters and fires heavy explosive artillery shells at approaching enemy warships, hostile trade boats, and landing troop transports before they reach your beaches.
+- **Upgrades**: Upgrades from Level 1 to Level 3 increase firing range from 14 to 24 tiles, reduce reload cooldown, and boost shell damage.
+
+### Military Barracks (Citadel)
+- **Cost**: 175,000 Gold
+- **Function**: Dedicated military mobilization academy. Trains fresh combat divisions directly into your national troop reserves every 3 seconds (+150 troops/level per cycle).
+- **Tactical Benefit**: Expands your nation's maximum population ceiling by **+15,000 troops per level** and projects an assault breakthrough aura that accelerates frontline push penetration.
+
+### Central Bank (National Treasury)
+- **Cost**: 250,000 Gold
+- **Function**: High-yield financial institution. Automatically compounds **2%–4% interest** on your national gold reserves every 5 seconds.
+- **Economic Multipliers**: Multiplies profits from maritime trade and train lines, and provides up to a **25% national discount** on all infrastructure and building construction costs.
+
+### Military Airbase
+- **Cost**: 400,000 Gold
+- **Function**: Command hub for tactical air superiority. Detects hostile naval invasion flotillas, warships, and frontline enemy positions within its combat air patrol envelope.
+- **Tactical Sorties**: Automatically scrambles high-speed delta-wing strike fighters on precision bombing runs, detonating explosive ordnance on enemy troop transports and defensive fortifications before returning to base to refuel.
 
 ---
 

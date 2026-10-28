@@ -1045,7 +1045,9 @@ export class Game {
     }
     if (!prepaid && !this.isDev()) {
       const existing = STRUCTURES.has(type) ? this.stackTarget(player, type, tile) : undefined;
-      const cost = existing ? this.config.upgradeCost(type, existing.level) : this.config.unitCost(type, this.ownedForCost(player, type));
+      let cost = existing ? this.config.upgradeCost(type, existing.level) : this.config.unitCost(type, this.ownedForCost(player, type));
+      const discount = this.config.bankDiscount(player.unitCount(UnitType.Bank));
+      if (discount > 0) cost = Math.max(1, Math.floor(cost * (1 - discount)));
       if (player.gold < cost) return `Not enough gold (${fmt(cost)})`;
     }
     return null;
@@ -1360,6 +1362,14 @@ export function unitLabel(t: UnitType): string {
       return "Radar";
     case UnitType.CoastalBattery:
       return "Coastal Battery";
+    case UnitType.Barracks:
+      return "Barracks";
+    case UnitType.Bank:
+      return "Central Bank";
+    case UnitType.Airbase:
+      return "Airbase";
+    case UnitType.Airplane:
+      return "Fighter";
     case UnitType.Warship:
       return "Warship";
     case UnitType.TransportShip:

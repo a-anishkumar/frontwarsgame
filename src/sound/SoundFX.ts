@@ -283,6 +283,73 @@ export class SoundFX {
     osc.stop(t + 0.05);
   }
 
+  /** Jet fighter flyby roar */
+  playAirstrike(): void {
+    const ctx = this.initCtx();
+    if (!ctx || this.muted) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.linearRampToValueAtTime(740, t + 0.25);
+    osc.frequency.exponentialRampToValueAtTime(180, t + 0.6);
+
+    gain.gain.setValueAtTime(0.01, t);
+    gain.gain.linearRampToValueAtTime(0.18, t + 0.22);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(t);
+    osc.stop(t + 0.7);
+  }
+
+  /** Aerial bomb detonation */
+  playBombDetonate(): void {
+    const ctx = this.initCtx();
+    if (!ctx || this.muted) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(25, t + 0.35);
+
+    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+
+    osc.start(t);
+    osc.stop(t + 0.45);
+    this.playNoiseBurst(0.25, 0.3, 400);
+  }
+
+  /** Central Bank cash collection chime */
+  playCash(): void {
+    const ctx = this.initCtx();
+    if (!ctx || this.muted) return;
+    const t = ctx.currentTime;
+    [659.25, 987.77].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const st = t + i * 0.07;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, st);
+      gain.gain.setValueAtTime(0.15, st);
+      gain.gain.exponentialRampToValueAtTime(0.001, st + 0.2);
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(st);
+      osc.stop(st + 0.22);
+    });
+  }
+
   private playNoiseBurst(gainVal: number, duration: number, cutoffFreq: number): void {
     if (!this.ctx || this.muted) return;
     const bufferSize = Math.floor(this.ctx.sampleRate * duration);

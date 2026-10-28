@@ -423,6 +423,8 @@ export class FlatUnitLayer {
         this.drawTradeShip(ctx, x, sy, u.heading, s, ownerColor, u, now, zoom);
       } else if (u.type === UnitType.Shell) {
         this.drawShell(ctx, x, y, u);
+      } else if (u.type === UnitType.Airplane) {
+        this.drawAirplane(ctx, x, y, u.heading, ownerColor, now, zoom);
       } else if (NUKES.has(u.type) || u.type === UnitType.SAMMissile) {
         // Track smoke trail
         let trail = this.missileTrails.get(u.id);
@@ -898,6 +900,69 @@ export class FlatUnitLayer {
     ctx.moveTo(x, y);
     ctx.lineTo(x - hx, y - hy);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawAirplane(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    heading: number,
+    ownerColor: string,
+    now: number,
+    zoom: number,
+  ): void {
+    const s = Math.max(10, Math.min(24, 7 + 4 * Math.sqrt(zoom)));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(heading);
+
+    // Ground shadow
+    ctx.save();
+    ctx.translate(s * 0.4, s * 0.4);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.8);
+    ctx.lineTo(s * 0.7, s * 0.6);
+    ctx.lineTo(0, s * 0.3);
+    ctx.lineTo(-s * 0.7, s * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Afterburner thrust flame
+    const flicker = 0.8 + 0.4 * Math.sin(now * 0.05);
+    ctx.fillStyle = "rgba(255, 140, 30, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.15, s * 0.35);
+    ctx.lineTo(0, s * (0.55 + 0.25 * flicker));
+    ctx.lineTo(s * 0.15, s * 0.35);
+    ctx.closePath();
+    ctx.fill();
+
+    // Delta-wing fighter fuselage
+    ctx.fillStyle = ownerColor;
+    ctx.strokeStyle = "#140e0a";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.85); // Nose
+    ctx.lineTo(s * 0.75, s * 0.45); // Right wingtip
+    ctx.lineTo(s * 0.2, s * 0.25);
+    ctx.lineTo(s * 0.2, s * 0.4);
+    ctx.lineTo(0, s * 0.25); // Tail
+    ctx.lineTo(-s * 0.2, s * 0.4);
+    ctx.lineTo(-s * 0.2, s * 0.25);
+    ctx.lineTo(-s * 0.75, s * 0.45); // Left wingtip
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cockpit canopy glass
+    ctx.fillStyle = "#80d8ff";
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.3, s * 0.1, s * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 

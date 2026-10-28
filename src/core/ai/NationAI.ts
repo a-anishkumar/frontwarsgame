@@ -554,6 +554,24 @@ export class NationAI implements Execution {
         }
       }
     }
+    // Barracks: aggressive training centers for standing troop reserves
+    const barracks = p.unitCount(UnitType.Barracks);
+    const barracksCost = cfg.unitCost(UnitType.Barracks, game.ownedForCost(p, UnitType.Barracks));
+    if (p.gold >= barracksCost && barracks < 1 + Math.floor(refTiles / 4000) && this.random.chance(20)) {
+      if (this.tryBuild(UnitType.Barracks, this.emptyNear(this.interiorTile(), 10))) return;
+    }
+    // Bank: economic powerhouse for wealthy nations
+    const banks = p.unitCount(UnitType.Bank);
+    const bankCost = cfg.unitCost(UnitType.Bank, game.ownedForCost(p, UnitType.Bank));
+    if (p.gold >= bankCost * 1.5 && banks < 1 + Math.floor(refTiles / 6000) && this.random.chance(25)) {
+      if (this.tryBuild(UnitType.Bank, this.emptyNear(this.interiorTile(), 8))) return;
+    }
+    // Airbase: air power and precision airstrikes
+    const airbases = p.unitCount(UnitType.Airbase);
+    const airbaseCost = cfg.unitCost(UnitType.Airbase, game.ownedForCost(p, UnitType.Airbase));
+    if (p.gold >= airbaseCost && airbases < 1 + Math.floor(refTiles / 8000) && minutes > 3 && this.random.chance(25)) {
+      if (this.tryBuild(UnitType.Airbase, this.emptyNear(this.interiorTile(), 12))) return;
+    }
     // Missile silo (mid/late game, not on easy)
     if (!cfg.settings.disableNukes && cfg.difficulty !== Difficulty.Easy && minutes > 6) {
       const silos = p.unitCount(UnitType.MissileSilo);

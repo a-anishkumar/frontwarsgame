@@ -47,6 +47,22 @@ export const PIXEL_ICONS: Record<UnitType, PixelIcon> = {
     rows: ["..#..#..", "..#..#..", ".##..##.", ".######.", "#++++++#", "#+wwww+#", ".######.", "..####.."],
     colors: { "#": W, "+": "#dfe6ee", w: W },
   },
+  [UnitType.Barracks]: {
+    rows: ["...##...", "..#++#..", ".######.", "#++++++#", "##+ww+##", ".#+ww+#.", ".######.", "..####.."],
+    colors: { "#": W, "+": "#dfe6ee", w: W },
+  },
+  [UnitType.Bank]: {
+    rows: ["...##...", "..####..", ".######.", "#++++++#", "#+#+#+#.", "#+#+#+#.", ".######.", "########"],
+    colors: { "#": W, "+": "#dfe6ee" },
+  },
+  [UnitType.Airbase]: {
+    rows: ["...##...", "..#++#..", ".######.", "###++###", "..#++#..", ".######.", "..####..", "########"],
+    colors: { "#": W, "+": "#dfe6ee" },
+  },
+  [UnitType.Airplane]: {
+    rows: ["...##...", "..#++#..", ".######.", "########", "..#++#..", "...##...", "..####..", "........"],
+    colors: { "#": "#1a140e", "+": W },
+  },
   [UnitType.Warship]: {
     rows: ["........", "....#...", "...###..", "..#+#+..", ".#######", "#+++++++", ".#######", "..#####."],
     colors: { "#": "#1a140e", "+": W },
@@ -111,6 +127,12 @@ export function structureShape(type: UnitType): { kind: ShapeKind; scale: number
       return { kind: "triangle", scale: 1.55, iconFill: 0.85 };
     case UnitType.CoastalBattery:
       return { kind: "hexagon", scale: 1.12, iconFill: 0.85 };
+    case UnitType.Barracks:
+      return { kind: "square", scale: 1.15, iconFill: 0.85 };
+    case UnitType.Bank:
+      return { kind: "pentagon", scale: 1.15, iconFill: 0.85 };
+    case UnitType.Airbase:
+      return { kind: "octagon", scale: 1.25, iconFill: 0.9 };
     default:
       return { kind: "circle", scale: 1, iconFill: 0.85 };
   }
@@ -389,6 +411,9 @@ export const HUD_UNIT_ICON: Partial<Record<UnitType, string>> = {
   [UnitType.SAMLauncher]: hudUrl("sam"),
   [UnitType.Radar]: hudUrl("radar"),
   [UnitType.CoastalBattery]: hudUrl("battery"),
+  [UnitType.Barracks]: hudUrl("barracks"),
+  [UnitType.Bank]: hudUrl("bank"),
+  [UnitType.Airbase]: hudUrl("airbase"),
   [UnitType.Warship]: hudUrl("warship"),
   [UnitType.TransportShip]: hudUrl("boat"),
   [UnitType.TradeShip]: hudUrl("trade"),

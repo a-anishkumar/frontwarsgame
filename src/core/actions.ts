@@ -7,6 +7,9 @@ import { AttackExecution, fmt } from "./executions/AttackExecution";
 import { BorderMarchExecution } from "./executions/BorderMarchExecution";
 import { FactoryExecution } from "./executions/FactoryExecution";
 import { NukeExecution } from "./executions/NukeExecution";
+import { AirbaseExecution } from "./executions/AirbaseExecution";
+import { BankExecution } from "./executions/BankExecution";
+import { BarracksExecution } from "./executions/BarracksExecution";
 import { CoastalBatteryExecution } from "./executions/CoastalBatteryExecution";
 import { PortExecution } from "./executions/PortExecution";
 import { TransportShipExecution } from "./executions/TransportShipExecution";
@@ -202,6 +205,9 @@ export function build(game: Game, player: Player, type: UnitType, tile: TileRef,
     if (type === UnitType.Port) game.addExecution(new PortExecution(u));
     if (type === UnitType.Factory) game.addExecution(new FactoryExecution(u));
     if (type === UnitType.CoastalBattery) game.addExecution(new CoastalBatteryExecution(u));
+    if (type === UnitType.Barracks) game.addExecution(new BarracksExecution(u));
+    if (type === UnitType.Bank) game.addExecution(new BankExecution(u));
+    if (type === UnitType.Airbase) game.addExecution(new AirbaseExecution(u));
     return { ok: true };
   }
   return { ok: false, message: "Unknown unit" };

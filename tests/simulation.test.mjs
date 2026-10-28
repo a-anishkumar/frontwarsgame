@@ -7,6 +7,9 @@ import { Config } from '../src/core/Config.ts';
 import { AttackExecution } from '../src/core/executions/AttackExecution.ts';
 import { TransportShipExecution } from '../src/core/executions/TransportShipExecution.ts';
 import { CoastalBatteryExecution } from '../src/core/executions/CoastalBatteryExecution.ts';
+import { BarracksExecution } from '../src/core/executions/BarracksExecution.ts';
+import { BankExecution } from '../src/core/executions/BankExecution.ts';
+import { AirbaseExecution } from '../src/core/executions/AirbaseExecution.ts';
 import { portWaterTile } from '../src/core/executions/PortExecution.ts';
 import { NukeExecution } from '../src/core/executions/NukeExecution.ts';
 import { WaterPathfinder } from '../src/core/WaterPathfinder.ts';
@@ -641,4 +644,92 @@ test('coastal battery placement validation and automatic naval defense against h
   // A ShellExecution was dispatched targeting the enemy transport
   assert.ok(battery.cooldownUntil > game.ticks);
   assert.equal(battery.targetUnit, enemyTransport);
+});
+
+test('barracks trains recruits and increases national troop capacity', () => {
+  const { map, game } = world(128, 64, T.Plains);
+  const tile = map.ref(20, 20);
+  const p = player(game, tile);
+  p.gold = 2000000;
+
+  const initialMaxPop = game.config.maxPopulation(p);
+  const res = build(game, p, U.Barracks, tile);
+  assert.equal(res.ok, true);
+
+  const b = p.unitsOf(U.Barracks)[0];
+  assert.ok(b);
+  b.constructing = false;
+
+  // Max population increases with barracks levels
+  assert.ok(game.config.maxPopulation(p) > initialMaxPop);
+
+  const exec = new BarracksExecution(b);
+  exec.init(game);
+
+  const initialTroops = p.troops;
+  game.ticks += 35; // advance ticks past 30-tick recruit cycle
+  exec.tick();
+
+  // Fresh recruits were added to player troops
+  assert.ok(p.troops > initialTroops);
+});
+
+test('central bank compounds treasury interest and provides construction discounts', () => {
+  const { map, game } = world(128, 64, T.Plains);
+  const tile = map.ref(20, 20);
+  const p = player(game, tile);
+  p.gold = 5000000;
+
+  const res = build(game, p, U.Bank, tile);
+  assert.equal(res.ok, true);
+
+  const bank = p.unitsOf(U.Bank)[0];
+  assert.ok(bank);
+  bank.constructing = false;
+
+  // National building discount is active
+  const discount = game.config.bankDiscount(p.unitCount(U.Bank));
+  assert.ok(discount > 0);
+
+  const exec = new BankExecution(bank);
+  exec.init(game);
+
+  const prevGold = p.gold;
+  game.ticks += 55; // advance ticks past 50-tick interest cycle
+  exec.tick();
+
+  // Interest was credited to player treasury
+  assert.ok(p.gold > prevGold);
+});
+
+test('airbase scrambles strike fighters on precision bombing runs against enemy units', () => {
+  const { map, game } = world(128, 64, T.Plains);
+  const baseTile = map.ref(20, 20);
+  const targetTile = map.ref(28, 20);
+
+  const p1 = player(game, baseTile);
+  const p2 = game.addPlayer('Rival Nation', P.Nation, '#3366ff');
+  p2.hasSpawned = true;
+  game.conquer(p2, targetTile);
+  p1.gold = 5000000;
+
+  const res = build(game, p1, U.Airbase, baseTile);
+  assert.equal(res.ok, true);
+
+  const airbase = p1.unitsOf(U.Airbase)[0];
+  assert.ok(airbase);
+  airbase.constructing = false;
+
+  const enemyDefense = game.addUnit(U.DefensePost, p2, targetTile);
+  enemyDefense.level = 2;
+
+  const airbaseExec = new AirbaseExecution(airbase);
+  airbaseExec.init(game);
+
+  // Tick airbase to detect target and scramble strike fighter
+  airbaseExec.tick();
+
+  const planes = p1.unitsOf(U.Airplane);
+  assert.equal(planes.length, 1);
+  assert.equal(planes[0].targetUnit, enemyDefense);
 });

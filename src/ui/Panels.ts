@@ -85,10 +85,10 @@ export class PlayerPanel {
           h(
             "span",
             { class: "unit-counts" },
-            ...[UnitType.City, UnitType.Factory, UnitType.DefensePost, UnitType.Port, UnitType.MissileSilo, UnitType.SAMLauncher, UnitType.Radar, UnitType.CoastalBattery].map((t) =>
+            ...[UnitType.City, UnitType.Factory, UnitType.DefensePost, UnitType.Port, UnitType.MissileSilo, UnitType.SAMLauncher, UnitType.Radar, UnitType.CoastalBattery, UnitType.Barracks, UnitType.Bank, UnitType.Airbase].map((t) =>
               p.unitLevels(t) > 0 ? h("span", { class: "uc" }, iconImg(t, 16), String(p.unitLevels(t))) : null,
             ),
-            [UnitType.City, UnitType.Factory, UnitType.DefensePost, UnitType.Port, UnitType.MissileSilo, UnitType.SAMLauncher, UnitType.Radar, UnitType.CoastalBattery].every((t) => p.unitLevels(t) === 0) ? "none" : null,
+            [UnitType.City, UnitType.Factory, UnitType.DefensePost, UnitType.Port, UnitType.MissileSilo, UnitType.SAMLauncher, UnitType.Radar, UnitType.CoastalBattery, UnitType.Barracks, UnitType.Bank, UnitType.Airbase].every((t) => p.unitLevels(t) === 0) ? "none" : null,
           ),
         ),
         !isMe && p.type !== PlayerType.Bot ? stat("Attitude", h("b", { class: `rel-${rel}` }, REL[rel])) : null,

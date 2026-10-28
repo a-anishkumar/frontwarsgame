@@ -109,6 +109,16 @@ export class Player {
     for (const u of this.units) if (u.type === UnitType.City && u.active && !u.constructing) n += u.level;
     return n;
   }
+  get barracksLevels(): number {
+    let n = 0;
+    for (const u of this.units) if (u.type === UnitType.Barracks && u.active && !u.constructing) n += u.level;
+    return n;
+  }
+  get bankLevels(): number {
+    let n = 0;
+    for (const u of this.units) if (u.type === UnitType.Bank && u.active && !u.constructing) n += u.level;
+    return n;
+  }
 
   isBot(): boolean {
     return this.type === PlayerType.Bot;

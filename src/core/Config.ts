@@ -74,6 +74,7 @@ export interface PlayerLike {
   troops: number;
   workers: number;
   cityLevels: number;
+  barracksLevels?: number;
 }
 
 export class Config {
@@ -151,7 +152,8 @@ export class Config {
   maxPopulation(p: PlayerLike): number {
     if (this.settings.infiniteTroops && p.type === PlayerType.Human) return 1_000_000_000;
     const tiles = Math.max(1, (p.landArea ?? p.numTiles) * this.tileScale);
-    const base = 2 * (Math.pow(tiles, 0.6) * 1000 + 50_000) + p.cityLevels * this.cityPopulationIncrease();
+    const barracksBonus = (p.barracksLevels ?? 0) * 15_000;
+    const base = 2 * (Math.pow(tiles, 0.6) * 1000 + 50_000) + p.cityLevels * this.cityPopulationIncrease() + barracksBonus;
     if (p.type === PlayerType.Bot) return base / 3;
     if (p.type === PlayerType.Human) return base;
     switch (this.difficulty) {
@@ -412,6 +414,12 @@ export class Config {
         return Math.min(1_200_000, (n + 1) * 200_000);
       case UnitType.CoastalBattery:
         return Math.min(600_000, (n + 1) * 150_000);
+      case UnitType.Barracks:
+        return Math.min(750_000, (n + 1) * 175_000);
+      case UnitType.Bank:
+        return Math.min(1_000_000, (n + 1) * 250_000);
+      case UnitType.Airbase:
+        return Math.min(1_500_000, (n + 1) * 400_000);
       case UnitType.Warship:
         return Math.min(1_000_000, (n + 1) * 250_000);
       case UnitType.AtomBomb:
@@ -445,6 +453,12 @@ export class Config {
         return Math.min(800_000, (level + 1) * 200_000);
       case UnitType.CoastalBattery:
         return Math.min(800_000, (level + 1) * 200_000);
+      case UnitType.Barracks:
+        return Math.min(600_000, (level + 1) * 150_000);
+      case UnitType.Bank:
+        return Math.min(800_000, (level + 1) * 200_000);
+      case UnitType.Airbase:
+        return Math.min(1_200_000, (level + 1) * 300_000);
       default:
         return 0;
     }
@@ -464,6 +478,12 @@ export class Config {
       case UnitType.Radar:
         return 3;
       case UnitType.CoastalBattery:
+        return 3;
+      case UnitType.Barracks:
+        return 5;
+      case UnitType.Bank:
+        return 5;
+      case UnitType.Airbase:
         return 3;
       default:
         return 1;
@@ -602,9 +622,33 @@ export class Config {
         return 40;
       case UnitType.CoastalBattery:
         return 50;
+      case UnitType.Barracks:
+        return 40;
+      case UnitType.Bank:
+        return 40;
+      case UnitType.Airbase:
+        return 60;
       default:
         return 0;
     }
+  }
+  airbaseRange(level: number): number {
+    return Math.max(1, Math.round(this.tiles(28 + (level - 1) * 12)));
+  }
+  airbaseCooldown(level: number): number {
+    return Math.max(20, 50 - (level - 1) * 10);
+  }
+  barracksTroopsPerCycle(level: number): number {
+    return 150 * level;
+  }
+  barracksBreakthroughRange(level: number): number {
+    return Math.max(1, Math.round(this.tiles(10 + (level - 1) * 4)));
+  }
+  bankInterestRate(level: number): number {
+    return 0.015 + level * 0.005;
+  }
+  bankDiscount(bankCount: number): number {
+    return Math.min(0.25, bankCount * 0.05);
   }
   coastalBatteryRange(level: number): number {
     return Math.max(1, Math.round(this.tiles(14 + (level - 1) * 5)));
