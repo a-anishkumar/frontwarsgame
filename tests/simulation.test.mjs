@@ -10,6 +10,7 @@ import { CoastalBatteryExecution } from '../src/core/executions/CoastalBatteryEx
 import { BarracksExecution } from '../src/core/executions/BarracksExecution.ts';
 import { BankExecution } from '../src/core/executions/BankExecution.ts';
 import { AirbaseExecution } from '../src/core/executions/AirbaseExecution.ts';
+import { NationAI } from '../src/core/ai/NationAI.ts';
 import { portWaterTile } from '../src/core/executions/PortExecution.ts';
 import { NukeExecution } from '../src/core/executions/NukeExecution.ts';
 import { WaterPathfinder } from '../src/core/WaterPathfinder.ts';
@@ -770,4 +771,41 @@ test('surrender offer and nation annexation transfer territory and treasury clea
   assert.equal(human.gold, prevHumanGold + 75000);
   assert.equal(rival.gold, 0);
 });
+
+test('neighboring countries attack each other in measured small-scale skirmishes rather than suicidal dumps', () => {
+  const { map, game } = world(128, 64, T.Plains);
+  const tA = map.ref(20, 20);
+  const tB = map.ref(21, 20);
+
+  const countryA = game.addPlayer('Country A', P.Nation, '#3366ff');
+  const countryB = game.addPlayer('Country B', P.Nation, '#ff3366');
+  countryA.hasSpawned = true;
+  countryB.hasSpawned = true;
+  countryA.spawnedAt = 0;
+  countryB.spawnedAt = 0;
+  game.ticks = 200;
+  countryA.personality = 'Expansionist';
+  countryA.attackRatio = 0.20;
+  countryA.troops = 10000;
+  countryB.troops = 10000;
+  game.conquer(countryA, tA);
+  for (let x = 21; x < 35; x++) game.conquer(countryB, map.ref(x, 20));
+
+  const aiA = new NationAI(countryA);
+  aiA.init(game);
+
+  // Directly test the AI attack method against neighboring enemy
+  const result = aiA['sendAttack'](countryB, false, 0.15);
+  assert.equal(result, true);
+
+  game.tick();
+
+  // Verify the attack was created and only committed small-scale troops (around 15%)
+  const attack = countryA.outgoingAttacks[0];
+  assert.ok(attack);
+  assert.equal(attack.target, countryB);
+  assert.ok(attack.troops() <= 2000, `Expected small-scale troops <= 2000, got ${attack.troops()}`);
+  assert.ok(countryA.troops >= 8000, `Expected remaining troops >= 8000, got ${countryA.troops}`);
+});
+
 

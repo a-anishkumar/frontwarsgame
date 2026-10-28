@@ -277,11 +277,11 @@ export class NationAI implements Execution {
       this.sendAttack(hostile[0]);
       return;
     }
-    // 3) weakest neighbour, if we're clearly stronger (bots first — they're easy prey)
+    // 3) weakest neighbour, if we're clearly stronger (bots first — small scale chipping)
     const bots = enemies.filter((e) => e.type === PlayerType.Bot);
     if (bots.length) {
       bots.sort((a, b) => a.troops / a.numTiles - b.troops / b.numTiles);
-      for (const b of bots.slice(0, 2)) this.sendAttack(b);
+      for (const b of bots.slice(0, 2)) this.sendAttack(b, false, 0.15);
       return;
     }
     const others = enemies.filter((e) => e.type !== PlayerType.Bot);
@@ -303,9 +303,15 @@ export class NationAI implements Execution {
     const ratio = p.troops / Math.max(1, target.troops);
     const baseThresh = p.personality === "Defensive" ? 2.0 : this.hard ? 0.9 : 1.15;
     const threshold = baseThresh / this.aggression;
+
+    if (target.isHuman() && game.ticks - target.spawnedAt < game.config.spawnImmunityTicks()) return;
+
     if (ratio >= threshold || (p.relation(target) <= Relation.Distrustful && this.random.chance(2))) {
-      if (target.isHuman() && game.ticks - target.spawnedAt < game.config.spawnImmunityTicks()) return;
-      this.sendAttack(target);
+      // Measured offensive push in small-to-medium scale
+      this.sendAttack(target, false, p.attackRatio);
+    } else if (this.random.chance(3) && p.personality !== "Defensive") {
+      // Small-scale border skirmish: probe rival border in small scale without risking homeland reserves
+      this.sendAttack(target, false, Math.min(0.12, p.attackRatio * 0.7));
     }
   }
 
@@ -335,12 +341,15 @@ export class NationAI implements Execution {
       const bite = Math.max(80, p.troops * (share ?? (this.early() ? 0.22 : 0.3)));
       troops = Math.min(p.troops - keep, bite);
     } else {
-      troops = p.troops - keep;
-      if (target.type !== PlayerType.Bot) troops = Math.min(troops, p.troops * (urgent ? 0.7 : 0.55));
+      // Small-scale tactical attacks: use measured percentage rather than dumping 70% of entire army
+      const attackShare = share ?? (urgent ? Math.min(0.35, p.attackRatio * 1.4) : p.attackRatio);
+      const bite = Math.max(80, p.troops * attackShare);
+      troops = Math.min(p.troops - keep, bite);
     }
     if (troops < 80) return false;
-    if (target && this.hard && troops < target.troops * 0.15) return false;
+    if (target && this.hard && troops < target.troops * 0.08) return false;
     if (target && p.isFriendly(target)) return false;
+    if (target && p.outgoingAttacks.filter((a) => a.isActive() && a.target === target).length >= 2) return false;
     const clipHome = target === null && p.countryId !== 0 && game.unownedInCountry(p.countryId) > 0;
     game.addExecution(new AttackExecution(troops, p, target, game.borderContact(p, target ? target.smallID : 0, clipHome ? p.countryId : 0)));
     if (target?.isHuman()) {

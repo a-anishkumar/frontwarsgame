@@ -61,6 +61,15 @@ export class BotAI implements Execution {
     }
     if (attacker) {
       game.addExecution(new AttackExecution(p.troops / 5, p, attacker, game.borderContact(p, attacker.smallID)));
+    } else if (this.random.chance(6) && p.troops > 250) {
+      // Occasional minor border squabble with neighboring tribe
+      const rival = this.random.randElement(enemies);
+      if (rival.type === PlayerType.Bot) {
+        const skirmishTroops = Math.min(p.troops * 0.12, 300);
+        if (skirmishTroops >= 80) {
+          game.addExecution(new AttackExecution(skirmishTroops, p, rival, game.borderContact(p, rival.smallID)));
+        }
+      }
     }
   }
 
