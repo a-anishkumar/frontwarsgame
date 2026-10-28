@@ -11,7 +11,9 @@
     "server": "node --env-file-if-exists=.env.local --import ./scripts/register-tests.mjs server/index.mjs",
     "db:init": "node --env-file-if-exists=.env.local --import ./scripts/register-tests.mjs scripts/multiplayer/init-db.mjs",
     "typecheck:server": "tsc -p tsconfig.server.json",
-    "map:online": "node scripts/multiplayer/export-map.mjs"
+    "map:online": "node scripts/multiplayer/export-map.mjs",
+    "package": "node scripts/package-release.mjs",
+    "zip": "node scripts/package-release.mjs"
   },
   "keywords": [],
   "author": "",

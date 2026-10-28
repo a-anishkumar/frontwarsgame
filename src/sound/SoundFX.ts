@@ -40,6 +40,13 @@ export class SoundFX {
     return this.muted;
   }
 
+  setMuted(m: boolean): void {
+    this.muted = m;
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
+    }
+  }
+
   toggleMute(): boolean {
     this.muted = !this.muted;
     try {

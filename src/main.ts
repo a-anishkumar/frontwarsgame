@@ -8,6 +8,7 @@ import { WorldLoading, loadingFrame } from "./ui/WorldLoading";
 import { loadWorld } from "./map/worlds";
 import { showMenu } from "./ui/Menu";
 import { h } from "./ui/dom";
+import { platform } from "./platform/GamePlatform";
 
 const ui = document.getElementById("ui")!;
 const labelsEl = document.getElementById("labels")!;
@@ -23,6 +24,7 @@ document.addEventListener("dragstart", (e) => {
 });
 
 async function main() {
+  await platform.init();
   const canvas = document.getElementById("globe") as HTMLCanvasElement;
   canvas.style.visibility = "hidden";
 
@@ -49,6 +51,8 @@ async function main() {
       canvas.style.visibility = "visible";
       labelsEl.style.visibility = "visible";
       loading.finish();
+      platform.gameLoadingFinished();
+      platform.gameplayStart();
       (window as unknown as { __map: unknown; __globe: unknown }).__map = map;
       (window as unknown as { __map: unknown; __globe: unknown }).__globe = globe;
     } catch (e) {
@@ -57,7 +61,6 @@ async function main() {
     }
   };
   showMenu(ui,settings=>void launch(settings),(info,client)=>void launch(info.settings,{info,client}));
-  // Build only the selected world; a second high-resolution map competes with match startup.
 }
 
 main().catch((e) => {

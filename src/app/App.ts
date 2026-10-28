@@ -28,6 +28,7 @@ import { RadialMenu, type RadialModel, type RadialSlice } from "../ui/RadialMenu
 import { h } from "../ui/dom";
 import { createGame } from "./setup";
 import { sound } from "../sound/SoundFX";
+import { platform } from "../platform/GamePlatform";
 
 const TICK_MS = 100;
 
@@ -362,6 +363,8 @@ export class App {
     if(this.online){this.hud.toast('Online matches run at server speed');return;}
     this.paused = !this.paused;
     this.hud.setPaused(this.paused);
+    if (this.paused) platform.gameplayStop();
+    else platform.gameplayStart();
   }
 
   private updateMissilePlan(): void {
@@ -1417,6 +1420,8 @@ export class App {
     if (!won && !lost) return;
     this.endShown = true;
     this.cancelBuild();
+    platform.gameplayStop();
+    if (won) platform.happyTime(1.0);
     showEndScreen(
       this.ui,
       game,
@@ -1424,7 +1429,10 @@ export class App {
       () => {
         /* keep watching */
       },
-      () => {if(this.online)this.online.send({type:"leave"});else location.reload();},
+      async () => {
+        await platform.showCommercialBreak();
+        if(this.online)this.online.send({type:"leave"});else location.reload();
+      },
     );
   }
 }
