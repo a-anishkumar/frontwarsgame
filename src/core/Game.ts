@@ -88,6 +88,8 @@ export class Game {
   onTacticalPing: ((tile: TileRef, color: string, label: string) => void) | null = null;
   /** Active strategic map ping for player-bot and player-player coordination */
   tacticalPing: { tile: TileRef; player: Player; tick: number; label: string } | null = null;
+  onSurrenderOffer: ((from: Player) => void) | null = null;
+  pendingSurrender: { from: Player; to: Player; tick: number } | null = null;
   /** when true, nation/bot AI does not act (dev mode) */
   devFreezeAi = false;
 
@@ -1213,6 +1215,52 @@ export class Game {
     this.onTacticalPing?.(tile, player.color, label);
     if (player.isHuman()) {
       this.displayMessage(`Tactical beacon placed: ${label}`, MessageType.Info, player.smallID);
+    }
+  }
+
+  offerSurrender(from: Player, to: Player): void {
+    if (!from.alive || !to.alive) return;
+    this.pendingSurrender = { from, to, tick: this.ticks };
+    this.onSurrenderOffer?.(from);
+    this.displayMessage(`🏳️ [${from.name}] We are broken! Commander, we offer unconditional surrender!`, MessageType.Warn);
+  }
+
+  acceptSurrender(): boolean {
+    if (!this.pendingSurrender) return false;
+    const { from, to } = this.pendingSurrender;
+    this.pendingSurrender = null;
+    if (!from.alive || !to.alive) return false;
+    this.annexNation(to, from);
+    return true;
+  }
+
+  rejectSurrender(): void {
+    if (!this.pendingSurrender) return;
+    const { from } = this.pendingSurrender;
+    this.pendingSurrender = null;
+    this.displayMessage(`Surrender offer from ${from.name} rejected. The war continues!`, MessageType.Info);
+  }
+
+  annexNation(conqueror: Player, defeated: Player): void {
+    if (!defeated.alive || !conqueror.alive) return;
+    const tilesToTake = [...defeated.tiles];
+    for (const tile of tilesToTake) {
+      this.conquer(conqueror, tile);
+    }
+    const lootedGold = Math.max(0, defeated.gold);
+    defeated.gold = 0;
+    conqueror.addGold(lootedGold);
+    conqueror.troops += Math.floor(defeated.troops * 0.5);
+    defeated.troops = 0;
+    defeated.diedAt = this.ticks;
+
+    for (const u of [...defeated.units]) {
+      this.removeUnit(u);
+    }
+    this.displayMessage(`🏳️ ${defeated.name} has capitulated to ${conqueror.name}! Territory and +${Math.round(lootedGold).toLocaleString()} gold annexed!`, MessageType.Success);
+    if (conqueror.isHuman()) {
+      const capital = conqueror.spawnTile >= 0 ? conqueror.spawnTile : tilesToTake[0] ?? 0;
+      this.onGoldFloat?.(capital, lootedGold, conqueror);
     }
   }
 

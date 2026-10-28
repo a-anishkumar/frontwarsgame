@@ -108,8 +108,10 @@ export class TrainExecution implements Execution {
     if (!stop.tradeAvailable(this.engine.owner)) return;
     const owner = this.engine.owner;
     const other = stop.owner;
+    const isHubAndSpoke = this.track.length <= 15;
     const rel = other === owner ? "self" : owner.isAlliedWith(other) ? "ally" : "other";
-    const gold = this.game.config.trainGold(rel, this.stopsVisited);
+    let gold = this.game.config.trainGold(rel, this.stopsVisited);
+    if (isHubAndSpoke) gold = Math.floor(gold * 1.25);
     this.stopsVisited++;
     owner.addGold(gold);
     if (other !== owner && other.alive) other.addGold(gold);

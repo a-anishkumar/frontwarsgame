@@ -58,6 +58,8 @@ export class Hud {
   private spawnHint: HTMLElement;
   private modeHint: HTMLElement;
   private emojiPop: HTMLElement;
+  private surrenderBanner: HTMLElement;
+  private presetButtons: HTMLButtonElement[] = [];
 
   constructor(
     container: HTMLElement,
@@ -99,6 +101,31 @@ export class Hud {
     this.troopLabel = h("span", { class: "slider-value" });
     this.troopSlider.oninput = () => cb.onTroopRatio(Number(this.troopSlider.value) / 100);
 
+    const PRESETS = [
+      { label: "1% Scout", ratio: 0.01, title: "Pixel Probe: 1% scout boat to distant islands (Reddit Meta)" },
+      { label: "20% Rush", ratio: 0.20, title: "Neutral Grab: 20% safe expansion without exhausting army" },
+      { label: "42% 🔥", ratio: 0.42, title: "42% Sweet Spot: Peak troop regeneration sweet spot" },
+      { label: "50% Half", ratio: 0.50, title: "50% Half Army Assault" },
+      { label: "100% ⚔️", ratio: 1.00, title: "100% Total Mobilization Blitz" },
+    ];
+    this.presetButtons = PRESETS.map((p) => {
+      const btn = h(
+        "button",
+        {
+          class: `preset-pill ${Math.abs(human.attackRatio - p.ratio) < 0.02 ? "active" : ""}`,
+          title: p.title,
+          onClick: () => {
+            cb.onAttackRatio(p.ratio);
+            this.attackSlider.value = String(Math.round(p.ratio * 100));
+            this.syncSliders();
+          },
+        },
+        p.label,
+      ) as HTMLButtonElement;
+      return btn;
+    });
+    const presetRow = h("div", { class: "preset-pills-row" }, ...this.presetButtons);
+
     this.emojiPop = h(
       "div",
       { class: "emoji-pop glass" },
@@ -125,7 +152,7 @@ export class Hud {
       this.popBar,
       this.popText,
       h("div", { class: "stat-grid" }, h("div", {}, h("div", { class: "stat-label" }, "Gold"), this.goldText), h("div", {}, h("div", { class: "stat-label" }, "Growth"), this.growthText)),
-      h("div", { class: "slider-row" }, h("div", { class: "slider-head" }, h("label", {}, "Attack ratio"), this.attackLabel), this.attackSlider),
+      h("div", { class: "slider-row" }, h("div", { class: "slider-head" }, h("label", {}, "Attack ratio"), this.attackLabel), this.attackSlider, presetRow),
       h("div", { class: "slider-row" }, h("div", { class: "slider-head" }, h("label", {}, "Troops / Workers"), this.troopLabel), this.troopSlider),
       this.emojiPop,
     );
@@ -133,8 +160,9 @@ export class Hud {
     this.attacksBox = h("div", { class: "panel glass attacks" });
     this.events = h("div", { class: "events" });
     const right = h("div", { class: "right-column" }, this.leaderboard, this.attacksBox);
+    this.surrenderBanner = h("div", { class: "surrender-banner glass", style: "display:none" });
 
-    this.root = h("div", { class: "hud" }, top, this.spawnHint, this.modeHint, control, right, this.events);
+    this.root = h("div", { class: "hud" }, top, this.spawnHint, this.modeHint, this.surrenderBanner, control, right, this.events);
     container.appendChild(this.root);
   }
 
@@ -157,6 +185,12 @@ export class Hud {
     const human = this.game.human!;
     this.attackSlider.value = String(Math.round(human.attackRatio * 100));
     this.troopSlider.value = String(Math.round(human.targetTroopRatio * 100));
+    const ratios = [0.01, 0.20, 0.42, 0.50, 1.00];
+    for (const [i, r] of ratios.entries()) {
+      if (this.presetButtons[i]) {
+        this.presetButtons[i].classList.toggle("active", Math.abs(human.attackRatio - r) < 0.02);
+      }
+    }
   }
 
   update(): void {
@@ -206,7 +240,42 @@ export class Hud {
     this.growthText.replaceChildren(h("b", {}, `+${fmtTroops(cfg.populationIncrease(human) * 10)}`), h("span", { class: "muted" }, "/s"));
     this.attackLabel.textContent = `${Math.round(human.attackRatio * 100)}% · ${fmtTroops(human.troops * human.attackRatio)}`;
     this.troopLabel.title = "More workers increase gold income; more troops strengthen your army.";
-    this.troopLabel.textContent = `${Math.round(human.targetTroopRatio * 100)} / ${Math.round(100 - human.targetTroopRatio * 100)}`;
+    if (game.pendingSurrender && game.pendingSurrender.to === human && game.pendingSurrender.from.alive) {
+      const from = game.pendingSurrender.from;
+      this.surrenderBanner.style.display = "";
+      this.surrenderBanner.replaceChildren(
+        h("div", { class: "surrender-title" }, `🏳️ ${from.flag ? from.flag + " " : ""}${from.name} offers Unconditional Surrender!`),
+        h("div", { class: "surrender-desc" }, `Will cede ${from.tiles.size} tiles, conscript reserves and ${fmt(from.gold)} gold to your empire.`),
+        h(
+          "div",
+          { class: "surrender-actions" },
+          h(
+            "button",
+            {
+              class: "btn btn-primary",
+              onClick: () => {
+                game.acceptSurrender();
+                this.surrenderBanner.style.display = "none";
+              },
+            },
+            "Accept & Annex Empire",
+          ),
+          h(
+            "button",
+            {
+              class: "btn btn-secondary",
+              onClick: () => {
+                game.rejectSurrender();
+                this.surrenderBanner.style.display = "none";
+              },
+            },
+            "Fight On",
+          ),
+        ),
+      );
+    } else {
+      this.surrenderBanner.style.display = "none";
+    }
 
     this.updateLeaderboard(alive);
     this.updateAttacks();

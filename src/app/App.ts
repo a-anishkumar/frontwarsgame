@@ -737,6 +737,38 @@ export class App {
         this.retaliate();
         return;
       }
+      if (e.shiftKey) {
+        if (e.key === "!" || e.code === "Digit1") {
+          this.setRatio("attackRatio", 0.01);
+          this.hud.syncSliders();
+          this.hud.toast("Attack Ratio: 1% (Pixel Scout)");
+          return;
+        }
+        if (e.key === "@" || e.code === "Digit2") {
+          this.setRatio("attackRatio", 0.20);
+          this.hud.syncSliders();
+          this.hud.toast("Attack Ratio: 20% (Neutral Rush)");
+          return;
+        }
+        if (e.key === "#" || e.code === "Digit3") {
+          this.setRatio("attackRatio", 0.42);
+          this.hud.syncSliders();
+          this.hud.toast("Attack Ratio: 42% (Sweet Spot 🔥)");
+          return;
+        }
+        if (e.key === "$" || e.code === "Digit4") {
+          this.setRatio("attackRatio", 0.50);
+          this.hud.syncSliders();
+          this.hud.toast("Attack Ratio: 50% (Assault)");
+          return;
+        }
+        if (e.key === "%" || e.code === "Digit5") {
+          this.setRatio("attackRatio", 1.00);
+          this.hud.syncSliders();
+          this.hud.toast("Attack Ratio: 100% (All-In ⚔️)");
+          return;
+        }
+      }
 
       // 1-6 keys: build City, Factory, Port, Defense Post, Silo, SAM on tile under cursor
       if (["1", "2", "3", "4", "5", "6"].includes(e.key)) {

@@ -733,3 +733,41 @@ test('airbase scrambles strike fighters on precision bombing runs against enemy 
   assert.equal(planes.length, 1);
   assert.equal(planes[0].targetUnit, enemyDefense);
 });
+
+test('surrender offer and nation annexation transfer territory and treasury cleanly', () => {
+  const { map, game } = world(128, 64, T.Plains);
+  const t1 = map.ref(10, 10);
+  const t2 = map.ref(11, 10);
+  const t3 = map.ref(12, 10);
+
+  const human = player(game, t1);
+  const rival = game.addPlayer('Rival Faction', P.Nation, '#3366ff');
+  rival.hasSpawned = true;
+  rival.troops = 1500;
+  rival.gold = 75000;
+  game.conquer(rival, t2);
+  game.conquer(rival, t3);
+
+  // Propose surrender
+  game.offerSurrender(rival, human);
+  assert.ok(game.pendingSurrender);
+  assert.equal(game.pendingSurrender.from, rival);
+  assert.equal(game.pendingSurrender.to, human);
+
+  const prevHumanGold = human.gold;
+  // Human accepts surrender
+  const accepted = game.acceptSurrender();
+  assert.equal(accepted, true);
+  assert.equal(game.pendingSurrender, null);
+
+  // Territory transferred to human
+  assert.equal(map.owner[t2], human.smallID);
+  assert.equal(map.owner[t3], human.smallID);
+  assert.equal(rival.tiles.size, 0);
+  assert.equal(rival.alive, false);
+
+  // Gold annexed
+  assert.equal(human.gold, prevHumanGold + 75000);
+  assert.equal(rival.gold, 0);
+});
+

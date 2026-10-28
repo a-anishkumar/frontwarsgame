@@ -235,7 +235,7 @@ export class NationAI implements Execution {
       const human = game.human;
       if (human && enemies.includes(human) && this.random.chance(12)) {
         this.surrendered = true;
-        game.displayMessage(`${countryFlag(p.name)} [${p.name}] We are broken! Commander, we offer unconditional surrender!`, MessageType.Warn);
+        game.offerSurrender(p, human);
       }
     }
     this.maybeSendAllianceRequests(enemies);
@@ -346,6 +346,10 @@ export class NationAI implements Execution {
     if (target?.isHuman()) {
       this.maybeAttackEmoji(target);
       if (!p.embargoes.has(target.smallID)) game.setEmbargo(p, target, true);
+      const humanMax = game.config.maxPopulation(target);
+      if ((p.personality === "Opportunist" || p.personality === "Aggressive") && target.troops / humanMax < 0.12) {
+        game.displayMessage(`${countryFlag(p.name)} [${p.name}] Tactical Intel: Opportunist strike launched against your depleted defenses!`, MessageType.Warn);
+      }
     }
     return true;
   }
