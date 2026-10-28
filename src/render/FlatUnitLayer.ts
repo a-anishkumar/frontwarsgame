@@ -804,83 +804,73 @@ export class FlatUnitLayer {
     ctx.save();
     ctx.translate(x, y);
 
-    const L = s * 1.4;
-    const W = s * 0.52;
+    const L = s * 1.25;
+    const W = s * 0.40;
 
     ctx.save();
     ctx.rotate(heading);
 
-    // Stern cargo wake
-    const wakeT = (now * 0.0025 + u.id * 0.4) % 1;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * (1 - wakeT)})`;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(-W * 0.35, L * 0.5);
-    ctx.lineTo(-W * (0.6 + 0.5 * wakeT), L * (1.0 + 0.6 * wakeT));
-    ctx.moveTo(W * 0.35, L * 0.5);
-    ctx.lineTo(W * (0.6 + 0.5 * wakeT), L * (1.0 + 0.6 * wakeT));
-    ctx.stroke();
-
-    // Shadow
-    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-    ctx.beginPath();
-    ctx.roundRect(-W * 0.45 + 1, -L * 0.55 + 2, W * 0.9, L * 1.05, 3);
-    ctx.fill();
-
-    // Commercial Cargo Hull
-    ctx.fillStyle = "#1e293b";
-    ctx.strokeStyle = shade(ownerColor, -0.4);
+    // Subtle stern wake
+    const wakeT = (now * 0.002 + u.id * 0.35) % 1;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 * (1 - wakeT)})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, -L * 0.6); // bulbous bow
-    ctx.lineTo(W * 0.44, -L * 0.35);
-    ctx.lineTo(W * 0.44, L * 0.45);
-    ctx.lineTo(-W * 0.44, L * 0.45);
-    ctx.lineTo(-W * 0.44, -L * 0.35);
+    ctx.moveTo(-W * 0.25, L * 0.45);
+    ctx.lineTo(-W * (0.4 + 0.4 * wakeT), L * (0.8 + 0.5 * wakeT));
+    ctx.moveTo(W * 0.25, L * 0.45);
+    ctx.lineTo(W * (0.4 + 0.4 * wakeT), L * (0.8 + 0.5 * wakeT));
+    ctx.stroke();
+
+    // Soft hull shadow
+    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+    ctx.beginPath();
+    ctx.ellipse(0, 1.5, W * 0.45, L * 0.52, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Streamlined Trade Hull
+    ctx.fillStyle = "#1e293b";
+    ctx.strokeStyle = shade(ownerColor, -0.4);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.55); // sharp prow
+    ctx.lineTo(W * 0.42, -L * 0.25);
+    ctx.lineTo(W * 0.40, L * 0.45);
+    ctx.lineTo(-W * 0.40, L * 0.45);
+    ctx.lineTo(-W * 0.42, -L * 0.25);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Raised Forecastle
+    // Bow Trim (Owner Nationality Color)
     ctx.fillStyle = ownerColor;
     ctx.beginPath();
-    ctx.moveTo(0, -L * 0.6);
-    ctx.lineTo(W * 0.4, -L * 0.35);
-    ctx.lineTo(-W * 0.4, -L * 0.35);
+    ctx.moveTo(0, -L * 0.55);
+    ctx.lineTo(W * 0.38, -L * 0.25);
+    ctx.lineTo(-W * 0.38, -L * 0.25);
     ctx.closePath();
     ctx.fill();
 
-    // Multi-colored Cargo Containers in Hold
-    const containerColors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
-    const cw = W * 0.32;
-    const ch = L * 0.16;
-    for (let r = 0; r < 2; r++) {
-      const cy = -L * 0.25 + r * (ch + 1.5);
-      const c1 = containerColors[(u.id + r * 2) % containerColors.length];
-      ctx.fillStyle = c1;
-      ctx.fillRect(-W * 0.38, cy, cw, ch);
-      const c2 = containerColors[(u.id + r * 2 + 1) % containerColors.length];
-      ctx.fillStyle = c2;
-      ctx.fillRect(W * 0.06, cy, cw, ch);
-    }
+    // Clean, Harmonious Cargo Bay (Warm golden-teak tone)
+    ctx.fillStyle = "#d97706";
+    ctx.fillRect(-W * 0.28, -L * 0.18, W * 0.56, L * 0.38);
+    ctx.strokeStyle = "#92400e";
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(-W * 0.28, -L * 0.18, W * 0.56, L * 0.38);
+    ctx.beginPath();
+    ctx.moveTo(0, -L * 0.18);
+    ctx.lineTo(0, L * 0.20);
+    ctx.moveTo(-W * 0.28, L * 0.01);
+    ctx.lineTo(W * 0.28, L * 0.01);
+    ctx.stroke();
 
-    // Aft Bridge & Smokestack
+    // Aft Bridge & Deckhouse
     ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(-W * 0.35, L * 0.24, W * 0.7, L * 0.18);
-    ctx.fillStyle = "#dc2626"; // smokestack
-    ctx.fillRect(-W * 0.1, L * 0.34, W * 0.2, L * 0.08);
+    ctx.fillRect(-W * 0.30, L * 0.24, W * 0.60, L * 0.16);
+    ctx.fillStyle = "#38bdf8"; // windshield
+    ctx.fillRect(-W * 0.22, L * 0.26, W * 0.44, Math.max(1, L * 0.04));
 
-    ctx.restore(); // restore heading rotation
-
-    // Cargo Gold Icon Badge
-    if (zoom >= 0.75) {
-      ctx.font = "bold 9px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("💰", 0, -L * 0.7);
-    }
-
-    ctx.restore();
+    ctx.restore(); // restore rotation
+    ctx.restore(); // restore translation
   }
 
   private drawShell(ctx: CanvasRenderingContext2D, x: number, y: number, u: Unit): void {
