@@ -1,6 +1,6 @@
 import {createAuthClient} from '@neondatabase/auth';
 import {BetterAuthVanillaAdapter} from '@neondatabase/auth/vanilla/adapters';
-const url=(import.meta.env.VITE_NEON_AUTH_URL as string|undefined)??'/api/auth';
+const url = (import.meta.env.VITE_NEON_AUTH_URL as string | undefined) || undefined;
 export const neonAuth=url?createAuthClient(new URL(url,location.origin).href,{adapter:BetterAuthVanillaAdapter({fetchOptions:{credentials:'include'}})}):null;
 export const hasAccount=()=>!!neonAuth||!!localStorage.getItem('borderwars.session');
 export async function sessionUser(){if(!neonAuth)return null;const result=await neonAuth.getSession();if(result.error)throw new Error(result.error.message??'Could not restore your account');return result.data?.user??null;}
