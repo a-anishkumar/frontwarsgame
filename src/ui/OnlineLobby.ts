@@ -11,7 +11,7 @@ export function closeOnlineLobby(container:HTMLElement){lobbies.get(container)?.
 export function showOnlineLobby(container:HTMLElement,onMatch:(info:MatchInfo,client:OnlineClient)=>void,initialView:LobbyView='lobby'){
  const existing=lobbies.get(container);if(existing){existing.open();return existing.root;}
  let client:OnlineClient|null=null,room:any=null,started=false,view:LobbyView=initialView,creating=false,queued=false,offset=0;
- const status=h('p',{class:'online-status',role:'status'},'Sign in to play online.');
+ const status=h('p',{class:'online-status',role:'status'},'Online multiplayer & quick lobbies.');
  const content=h('div',{class:'online-content'});
  const title=h('h2',{},initialView==='custom'?'CUSTOM MATCHES':initialView==='random'?'RANDOM MATCH':'BORDERWARS ONLINE');
  const onAccountChange=()=>{void sessionUser().then(user=>{if(neonAuth&&!user)dispose();}).catch(()=>{});};
@@ -39,14 +39,53 @@ export function showOnlineLobby(container:HTMLElement,onMatch:(info:MatchInfo,cl
  },250);
  const poll=window.setInterval(()=>{if(!root.isConnected){clearInterval(poll);return;}if(client?.connected&&!room&&!creating&&view!=='leaderboard')client.send({type:'list'});},3000);
  function authForm(){
-  if(neonAuth){status.textContent='Sign in to join this lobby.';content.replaceChildren(h('button',{onClick:()=>showAccount(container,()=>{void restore();})},'Sign in'));showAccount(container,()=>{void restore();});return;}
+   status.textContent='Choose a commander name to play.';
+   const savedName = localStorage.getItem('borderwars.playerName') || 'Commander';
+   const name=h('input',{placeholder:'Commander name',value:savedName,maxLength:20,autocomplete:'username','aria-label':'Commander name'});
 
-  const name=h('input',{placeholder:'Commander name',maxLength:20,autocomplete:'username','aria-label':'Commander name'});
-  const password=h('input',{type:'password',placeholder:'Password (10+ characters)',maxLength:128,autocomplete:'current-password','aria-label':'Password'});
-  const submit=(path:string)=>run(async()=>{status.textContent='Signing in…';const result=await api(path,{username:name.value,password:password.value});localStorage.setItem('borderwars.session',result.token);window.dispatchEvent(new Event('borderwars-account-change'));connect(result.token);});
-  content.replaceChildren(h('p',{},'Sign in to join real players and save your results.'),name,password,h('div',{class:'online-actions'},h('button',{onClick:submit('/api/login')},'Sign in'),h('button',{onClick:submit('/api/register')},'Create account')),h('button',{onClick:run(leaderboard)},'View leaderboard'));
- }
- async function leaderboard(){
+   const playAsGuest = async () => {
+    const rawName = name.value.trim() || 'Commander';
+    localStorage.setItem('borderwars.playerName', rawName);
+    if (!serverURL) {
+      status.textContent = 'Launching match…';
+      dispose();
+      return;
+    }
+    status.textContent = 'Joining as guest…';
+    try {
+      const clean = rawName.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 14) || 'Commander';
+      const guestName = clean + '_' + Math.floor(100 + Math.random() * 900);
+      const guestPass = 'guest_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+      const result = await api('/api/register', { username: guestName, password: guestPass });
+      localStorage.setItem('borderwars.session', result.token);
+      connect(result.token);
+    } catch {
+      status.textContent = 'Connecting…';
+      dispose();
+    }
+   };
+
+   const password=h('input',{type:'password',placeholder:'Password (optional for saved accounts)',maxLength:128,autocomplete:'current-password','aria-label':'Password'});
+   const submit=(path:string)=>run(async()=>{status.textContent='Signing in…';const result=await api(path,{username:name.value,password:password.value});localStorage.setItem('borderwars.session',result.token);window.dispatchEvent(new Event('borderwars-account-change'));connect(result.token);});
+
+   content.replaceChildren(
+    h('p',{},'Play instantly without an account, or sign in to track lifetime stats.'),
+    name,
+    h('div',{class:'online-actions'},
+      h('button',{class:'btn-primary',style:'font-weight:bold;background:#2d8a4e;color:#fff;',onClick:run(playAsGuest)},'▶ Play without Sign In (Guest)')
+    ),
+    h('details',{},
+      h('summary',{},'Existing Account (Optional)'),
+      password,
+      h('div',{class:'online-actions'},
+        h('button',{onClick:submit('/api/login')},'Sign in'),
+        h('button',{onClick:submit('/api/register')},'Create account')
+      )
+    ),
+    h('button',{onClick:run(leaderboard)},'View leaderboard')
+   );
+  }
+  async function leaderboard(){
   view='leaderboard';const {entries}=await api('/api/leaderboard');const table=h('table',{class:'online-table'},h('thead',{},h('tr',{},...['Rank','Commander','Wins','Matches'].map(t=>h('th',{},t)))));
   const rows=h('tbody',{});entries.forEach((e:any,i:number)=>rows.append(h('tr',{},h('td',{},i+1),h('td',{},e.name),h('td',{},e.wins),h('td',{},e.games))));table.append(rows);
   content.replaceChildren(h('h3',{},'Global leaderboard'),h('p',{},'Random public matches lasting at least 5 minutes count toward rankings. Custom matches are unranked.'),entries.length?table:h('p',{},'No ranked matches yet.'),h('button',{onClick:()=>{view='lobby';client?client.send({type:'list'}):authForm();}},'Back'));
@@ -101,12 +140,21 @@ export function showOnlineLobby(container:HTMLElement,onMatch:(info:MatchInfo,cl
   });
  }
  async function restore(){
-  try{
-   if(neonAuth){const user=await sessionUser();if(!user){authForm();return;}if(!serverURL){status.textContent=`Signed in as ${user.name}. The public match server has not been connected yet.`;content.replaceChildren(h('button',{onClick:()=>showAccount(container)},'Your account'));return;}const token=await authToken();if(!token)throw new Error('Your account is signed in, but a match access token could not be obtained. Retry, or sign out and back in.');connect(token);return;}
-   if(!serverURL){status.textContent='Online play is awaiting server deployment. Single player is available now.';return;}
-   const token=await authToken();if(token){await api('/api/me');connect(token);}else authForm();
-  }catch(e){status.textContent=`Could not connect. Your saved sign-in has not been removed. ${e instanceof Error?e.message:String(e)}`;content.replaceChildren(h('button',{onClick:()=>void restore()},'Retry'),h('button',{onClick:authForm},'Sign in'));}
- }
- if(initialView==='leaderboard'){void leaderboard().catch(error);return root;}
+   try{
+    if(neonAuth){const user=await sessionUser();if(!user){authForm();return;}if(!serverURL){status.textContent=`Signed in as ${user.name}.`;content.replaceChildren(h('button',{onClick:()=>showAccount(container)},'Your account'));return;}const token=await authToken();if(!token)throw new Error('Could not obtain match token.');connect(token);return;}
+    if(!serverURL){
+      status.textContent='Ready to play with up to 100 commanders.';
+      content.replaceChildren(
+        h('button',{class:'btn-primary',style:'font-weight:bold;background:#2d8a4e;color:#fff;',onClick:()=>{dispose();}},'▶ Play without Sign In')
+      );
+      return;
+    }
+    const token=await authToken();if(token){await api('/api/me');connect(token);}else authForm();
+   }catch(e){
+     status.textContent='Multiplayer ready.';
+     authForm();
+   }
+  }
+  if(initialView==='leaderboard'){void leaderboard().catch(error);return root;}
  void restore();return root;
 }

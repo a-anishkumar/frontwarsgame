@@ -1,7 +1,7 @@
 import {neonAuth,sessionUser} from '../auth/session';
 import {showAccount} from './Account';
 import {hasAccount} from '../auth/session';
-import {api} from "../multiplayer/Client";
+import {api, serverURL} from "../multiplayer/Client";
 import {showWorldCreator} from "./WorldCreator";
 import {showCustomization} from "./Customization";
 import {showStore} from "./Store";
@@ -123,7 +123,18 @@ export function showMenu(container: HTMLElement, onPlay: (s: GameSettings) => vo
     onPlay(settings);
   };
 
-  const playFeatured = () => {openOnline('random');};
+  const playFeatured = () => {
+    if (!serverURL) {
+      finish({
+        world: 'earth',
+        numNations: 50,
+        numBots: 49,
+        instantBuild: false,
+      });
+    } else {
+      openOnline('random');
+    }
+  };
 
   const playWorld = (world: WorldId) => {
     finish({
@@ -225,7 +236,18 @@ export function showMenu(container: HTMLElement, onPlay: (s: GameSettings) => vo
       badge ? h("span", { class: "action-badge" }, badge) : null,
     );
 
-  const randomAction=action("primary","◎","Random Match",()=>openOnline('random'),'…');
+  const randomAction=action("primary","◎","Random Match",()=>{
+    if (!serverURL) {
+      finish({
+        world: 'earth',
+        numNations: 50,
+        numBots: 49,
+        instantBuild: false,
+      });
+    } else {
+      openOnline('random');
+    }
+  },'…');
   const customAction=action("","+","Custom Match",()=>openOnline('custom'),'…');
   const pollMatches=async()=>{if(polling)return;polling=true;try{const data=await api('/api/matchmaking');matchmaking=data;matchmakingOffset=data.serverTime-Date.now();randomAction.querySelector('.action-badge')!.textContent=String(data.randomPlayers);customAction.querySelector('.action-badge')!.textContent=String(data.customMatches);refreshFeatured();}catch{matchmaking=null;popEl.textContent='Match server unavailable';for(const button of [randomAction,customAction])button.querySelector('.action-badge')!.textContent='—';}finally{polling=false;}};
   const el = h(
