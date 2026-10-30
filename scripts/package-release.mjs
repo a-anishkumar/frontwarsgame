@@ -51,3 +51,4 @@ console.log(`  ✓ CrazyGames (CrazyGames SDK v3 ready)`);
 console.log(`  ✓ Poki (Poki SDK v2 ready)`);
 console.log(`  ✓ Itch.io (HTML5 browser playable)`);
 console.log(`  ✓ GameDistribution / Lagged / GameJolt`);
+

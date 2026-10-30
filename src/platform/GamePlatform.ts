@@ -9,9 +9,14 @@ declare global {
         init: () => Promise<void>;
         environment: string;
         game: {
+          loadingStart: () => void;
+          loadingStop: () => void;
           gameplayStart: () => void;
           gameplayStop: () => void;
           happytime: () => void;
+          settings?: { muteAudio?: boolean };
+          addSettingsChangeListener: (callback: (settings: { muteAudio?: boolean }) => void) => void;
+          removeSettingsChangeListener?: (callback: (settings: { muteAudio?: boolean }) => void) => void;
         };
         ad: {
           requestAd: (type: "midgame" | "rewarded") => Promise<void>;
@@ -58,7 +63,34 @@ export class GamePlatform {
     if (this.initialized) return;
     this.initialized = true;
 
-    // Detect Poki SDK
+    // Detect CrazyGames SDK v3 (priority in CrazyGames portal)
+    if (typeof window !== "undefined" && window.CrazyGames?.SDK) {
+      try {
+        await window.CrazyGames.SDK.init();
+        this.platform = "crazygames";
+        console.log("[Platform] CrazyGames SDK v3 successfully initialized");
+
+        try {
+          window.CrazyGames.SDK.game.loadingStart();
+        } catch {}
+
+        try {
+          const s = window.CrazyGames.SDK.game.settings;
+          if (s?.muteAudio) {
+            sound.setMuted(true);
+          }
+          window.CrazyGames.SDK.game.addSettingsChangeListener((newSettings) => {
+            sound.setMuted(Boolean(newSettings?.muteAudio));
+          });
+        } catch {}
+
+        return;
+      } catch (err) {
+        console.warn("[Platform] CrazyGames SDK init warning:", err);
+      }
+    }
+
+    // Detect Poki SDK v2
     if (typeof window !== "undefined" && window.PokiSDK) {
       try {
         await window.PokiSDK.init();
@@ -70,25 +102,17 @@ export class GamePlatform {
       }
     }
 
-    // Detect CrazyGames SDK
-    if (typeof window !== "undefined" && window.CrazyGames?.SDK) {
-      try {
-        await window.CrazyGames.SDK.init();
-        this.platform = "crazygames";
-        console.log("[Platform] CrazyGames SDK successfully initialized");
-        return;
-      } catch (err) {
-        console.warn("[Platform] CrazyGames SDK init warning (normal in dev/offline):", err);
-      }
-    }
-
     this.platform = "standalone";
     console.log("[Platform] Running in Standalone / Itch.io mode");
   }
 
   /** Call when all initial graphics, assets, and shaders are finished loading */
   gameLoadingFinished(): void {
-    if (this.platform === "poki" && window.PokiSDK) {
+    if (this.platform === "crazygames" && window.CrazyGames?.SDK) {
+      try {
+        window.CrazyGames.SDK.game.loadingStop();
+      } catch {}
+    } else if (this.platform === "poki" && window.PokiSDK) {
       try {
         window.PokiSDK.gameLoadingFinished();
       } catch {}
@@ -203,3 +227,4 @@ export class GamePlatform {
 }
 
 export const platform = GamePlatform.get();
+

@@ -144,7 +144,7 @@ export async function paintWorldPreview(canvas: HTMLCanvasElement, world: WorldI
 
 async function paintEarthPreview(ctx: CanvasRenderingContext2D, w: number, h: number): Promise<void> {
   try {
-    const bmp = await createImageBitmap(await (await fetch("/data/earth-water.png")).blob());
+    const bmp = await createImageBitmap(await (await fetch("./data/earth-water.png")).blob());
     const tmp = document.createElement("canvas");
     tmp.width = w;
     tmp.height = h;

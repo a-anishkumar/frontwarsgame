@@ -35,7 +35,7 @@ export function detectMapSize(): { width: number; height: number } {
   return { width: 5792, height: 2896 };
 }
 
-const DATA = "/data/";
+const DATA = "./data/";
 
 async function loadImageGray(url: string, w: number, h: number): Promise<Uint8ClampedArray> {
   const res = await fetch(url);
