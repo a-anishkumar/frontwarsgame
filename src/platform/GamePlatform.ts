@@ -18,6 +18,14 @@ declare global {
           addSettingsChangeListener: (callback: (settings: { muteAudio?: boolean }) => void) => void;
           removeSettingsChangeListener?: (callback: (settings: { muteAudio?: boolean }) => void) => void;
         };
+        user?: {
+          isUserAccountAvailable?: () => boolean;
+          getUser: () => Promise<{ username: string; profilePictureUrl?: string } | null>;
+          getUserToken?: () => Promise<string>;
+          showAuthPrompt: () => Promise<{ username: string; profilePictureUrl?: string }>;
+          addAuthListener: (callback: (user: { username: string; profilePictureUrl?: string } | null) => void) => void;
+          removeAuthListener?: (callback: (user: { username: string; profilePictureUrl?: string } | null) => void) => void;
+        };
         ad: {
           requestAd: (type: "midgame" | "rewarded") => Promise<void>;
         };
@@ -83,6 +91,12 @@ export class GamePlatform {
             sound.setMuted(Boolean(newSettings?.muteAudio));
           });
         } catch {}
+        try {
+          window.CrazyGames.SDK.user?.addAuthListener?.((user) => {
+            window.dispatchEvent(new CustomEvent("borderwars-account-change", { detail: user }));
+          });
+        } catch {}
+
 
         return;
       } catch (err) {
@@ -221,8 +235,37 @@ export class GamePlatform {
       }
       this.gameplayStart();
     }
-
     return rewarded;
+  }
+  /** Retrieve currently signed-in platform user (e.g. CrazyGames account) */
+  async getPlatformUser(): Promise<{ username: string; profilePictureUrl?: string } | null> {
+    if (this.platform === "crazygames" && window.CrazyGames?.SDK?.user) {
+      try {
+        const user = await window.CrazyGames.SDK.user.getUser();
+        if (user?.username) {
+          return { username: user.username, profilePictureUrl: user.profilePictureUrl };
+        }
+      } catch (e) {
+        console.warn("[Platform] getUser error:", e);
+      }
+    }
+    return null;
+  }
+
+  /** Prompt user to log in or register via platform UI (e.g. CrazyGames auth modal) */
+  async promptSignIn(): Promise<{ username: string; profilePictureUrl?: string } | null> {
+    if (this.platform === "crazygames" && window.CrazyGames?.SDK?.user) {
+      try {
+        const user = await window.CrazyGames.SDK.user.showAuthPrompt();
+        if (user?.username) {
+          window.dispatchEvent(new CustomEvent("borderwars-account-change", { detail: user }));
+          return { username: user.username, profilePictureUrl: user.profilePictureUrl };
+        }
+      } catch (e) {
+        console.warn("[Platform] showAuthPrompt error or closed:", e);
+      }
+    }
+    return null;
   }
 }
 

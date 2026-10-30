@@ -12,6 +12,7 @@ import type {OnlineClient} from "../multiplayer/Client";
 import type {MatchInfo} from "../multiplayer/protocol";
 import { DEFAULT_SETTINGS, Difficulty, GraphicsQuality, MAX_HUMANS, MAX_PLAYERS, SETTINGS_REV, UnitType, clampAi, clampRoster, rosterSize, type GameSettings, type WorldId } from "../core/types";
 import { currentFeatured, paintWorldPreview, WORLDS, worldDef, type FeaturedMatch } from "../map/worlds";
+import { platform } from "../platform/GamePlatform";
 import { h } from "./dom";
 
 const STORAGE_KEY = "borderwars.settings";
@@ -250,7 +251,19 @@ export function showMenu(container: HTMLElement, onPlay: (s: GameSettings) => vo
       h(
         "nav",
         { class: "lobby-nav" },
-        navBtn("▣", "Sign in", () => neonAuth?showAccount(container):openOnline()),
+        navBtn("▣", "Sign in", async () => {
+          if (platform.currentPlatform === "crazygames") {
+            const user = await platform.promptSignIn();
+            if (user?.username) {
+              name.value = user.username;
+              toast(el, `Signed in as ${user.username}`);
+              updateAccount();
+            }
+            return;
+          }
+          if (neonAuth) showAccount(container);
+          else openOnline();
+        }),
         navBtn("☺", "Invite", () => openOnline()),
         navBtn("▲", "Ranks", () => openOnline("leaderboard")),
         navBtn("★", "Store", () => showStore(container)),
@@ -321,7 +334,26 @@ export function showMenu(container: HTMLElement, onPlay: (s: GameSettings) => vo
   }, 250);
 
   container.appendChild(el);
-  const updateAccount=()=>{if(neonAuth)void sessionUser().then(user=>{if(!el.isConnected)return;const label=el.querySelector('.lobby-nav-lab');if(label)label.textContent=user?.name??'Sign in';}).catch(()=>{});};
+  const updateAccount = () => {
+    if (platform.currentPlatform === "crazygames") {
+      void platform.getPlatformUser().then(user => {
+        if (!el.isConnected) return;
+        const label = el.querySelector('.lobby-nav-lab');
+        if (user?.username) {
+          if (label) label.textContent = user.username;
+          name.value = user.username;
+        } else {
+          if (label) label.textContent = 'Sign in';
+        }
+      }).catch(() => {});
+      return;
+    }
+    if (neonAuth) void sessionUser().then(user => {
+      if (!el.isConnected) return;
+      const label = el.querySelector('.lobby-nav-lab');
+      if (label) label.textContent = user?.name ?? 'Sign in';
+    }).catch(() => {});
+  };
   const accountListener=()=>{if(!el.isConnected){window.removeEventListener('borderwars-account-change',accountListener);return;}updateAccount();};
   window.addEventListener('borderwars-account-change',accountListener);updateAccount();
 
